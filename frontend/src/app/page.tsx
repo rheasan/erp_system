@@ -19,8 +19,12 @@ export default function Home() {
 			<TopNavigation />
 			<div className="h-4/5 flex flex-row grow">
 				<Sidebar change_state={setCurrentState} states={current_component} />
-				<div className="h-4/5">
-					{currentState == current_component.Home && <p>homepage</p>}
+				<div className="w-4/5">
+					{currentState == current_component.Home && 
+						<div className="h-full w-full bg-gray-800 text-white flex justify-center items-center">
+							<p className="text-4xl">ERP System</p>
+						</div>	
+					}
 					{currentState == current_component.AddProcess && <AddProcess />}
 					{currentState == current_component.AddTicket && <AddTicket />}
 				</div>
