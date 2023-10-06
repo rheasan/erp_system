@@ -42,14 +42,17 @@ const AddProcess = () => {
 	};
 
 	return (
-		<div className="p-4 bg-white text-black">
-			<form className="flex flex-col gap-2" onSubmit={handleSubmit}>
+		<div className="p-4 bg-gray-800 text-white">
+			<form onSubmit={handleSubmit}>
 				<label htmlFor="name">name</label>
 				<input type="text" name="name" />
+				<br/>
 				<label htmlFor="desc">desc</label>
 				<input type="text" name="desc" />
+				<br/>
 				<label htmlFor="id">id</label>
 				<input type="text" name="id" />
+				<br/>
 				<div className="flex flex-row justify-around">
 					<p>Jobs</p>
 					<div
