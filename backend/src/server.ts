@@ -17,8 +17,8 @@ app.get("/hello", (req, res) => {
 });
 
 app.post("/create_process", async (req, res) => {
-    console.log(`request from ${req.ip}`);
-    console.log(req.body);
+    // console.log(`request from ${req.ip}`);
+    // console.log(req.body);
     const body = z_new_process.safeParse(req.body);
 
     if(!body.success){
@@ -28,7 +28,8 @@ app.post("/create_process", async (req, res) => {
 
     const result = await save_process(body.data);
     if(!result.success) {
-        res.status(200).json("failed to parse: " + result.error);
+        res.status(400).json("failed to parse: " + result.error);
+        return;
     }
     res.status(200).json("new process added");
     console.log(body.data);
