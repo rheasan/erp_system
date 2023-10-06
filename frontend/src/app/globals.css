@@ -31,6 +31,11 @@ label {
   font-weight: 400;
 }
 
+legend {
+  font-size: 1.2em;
+  font-weight: 400;
+}
+
 form {
   border-bottom: 2px black;
 }

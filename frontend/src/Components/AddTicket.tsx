@@ -26,12 +26,14 @@ const AddTicket = () => {
 	};
 
 	return (
-		<div className="p-4 bg-white text-black">
-			<form onSubmit={handleSubmit} className="flex flex-col gap-2">
+		<div className="p-4 bg-gray-800 text-white">
+			<form onSubmit={handleSubmit}>
 				<label htmlFor="user_id">User ID</label>
 				<input type="text" name="user_id" />
+				<br />
 				<label htmlFor="process_id">Process ID</label>
 				<input type="text" name="process_id" />
+				<br />
 				<fieldset>
 					<legend>Public? :</legend>
 					<div>
