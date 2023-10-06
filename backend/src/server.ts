@@ -2,6 +2,7 @@ import express from "express";
 import z from "zod";
 import {z_new_process, z_process} from "./processes";
 import save_process from "./save_process";
+import fsPromise from "node:fs/promises";
 
 const app = express();
 app.use(express.json());
@@ -35,6 +36,12 @@ app.post("/create_process", async (req, res) => {
     console.log(body.data);
 });
 
+app.get("/get_all_processes", async (req, res) => {
+    const processes : string = await fsPromise.readFile("./test_data/processes.json").then((res) => {
+        return JSON.parse(String(res));
+    });
+    res.status(200).send(processes);
+})
 
 app.listen(PORT, () => {
     console.log(`listening on port ${PORT}`);
