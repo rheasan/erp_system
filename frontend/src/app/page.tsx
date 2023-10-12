@@ -5,10 +5,12 @@ import Sidebar from "../Components/Sidebar";
 import Footer from "../Components/Footer";
 import AddProcess from "@/Components/AddProcess";
 import AddTicket from "@/Components/AddTicket";
+import GenerateTimetable from "@/Components/GenerateTimetable";
 import { useState } from "react";
 enum current_component {
 	AddTicket,
 	AddProcess,
+	GenerateTimetable,
 	Home,
 }
 export default function Home() {
@@ -27,6 +29,7 @@ export default function Home() {
 					}
 					{currentState == current_component.AddProcess && <AddProcess />}
 					{currentState == current_component.AddTicket && <AddTicket />}
+					{currentState == current_component.GenerateTimetable && <GenerateTimetable />}
 				</div>
 			</div>
 			<Footer />

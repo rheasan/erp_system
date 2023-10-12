@@ -31,6 +31,15 @@ const Sidebar = (props: any) => {
 					Create Ticket
 				</button>
 			</div>
+			<div>
+				<button
+					onClick={() => {
+						change_state(states.GenerateTimetable);
+					}}
+				>
+					Generate Timetable
+				</button>
+			</div>
 		</div>
 	);
 };
