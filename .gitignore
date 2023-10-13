@@ -3,3 +3,4 @@ dist
 test_data
 target
 .env
+migrations

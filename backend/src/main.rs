@@ -1,4 +1,4 @@
-use axum::{routing::get, Router};
+use axum::{routing::{get, post}, Router};
 use std::net::SocketAddr;
 
 pub mod process;
@@ -8,7 +8,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
     .route("/", get(say_hello))
-    .route("/process", get(process::get_processes));
+    .route("/process", get(process::get_processes))
+    .route("/process", post(process::create_process));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
     println!("Running on {}", addr);

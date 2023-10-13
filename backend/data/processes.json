@@ -1,30 +1,14 @@
 [
-    {
-        "pname": "aad",
-        "desc": "12",
-        "pid": "MD_0001",
-        "jobs": [
-            {
-                "name": "job1",
-                "commands": [
-                    "command1",
-                    "command2"
-                ]
-            }
-        ]
-    },
-    {
-        "pname": "aad",
-        "desc": "adad",
-        "pid": "MD_0001",
-        "jobs": [
-            {
-                "name": "job1",
-                "commands": [
-                    "command1",
-                    "command2"
-                ]
-            }
-        ]
-    }
+  {
+    "pname": "aad",
+    "pid": "MD_0001",
+    "jobs": [{ "name": "job1", "commands": ["command1", "command2"] }],
+    "desc": "12"
+  },
+  {
+    "pname": "aad",
+    "pid": "MD_0002",
+    "jobs": [{ "name": "job1", "commands": ["command1", "command2"] }],
+    "desc": "adad"
+  }
 ]
