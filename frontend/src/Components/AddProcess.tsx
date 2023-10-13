@@ -44,7 +44,7 @@ const AddProcess = () => {
 	const addCommandToJob = () => {};
 
 	return (
-		<div className="flex flex-row h-[510px]">
+		<div className="flex flex-row h-full w-full">
 			<div className="p-4 bg-gray-800 text-white w-1/2 overflow-y-scroll overscroll-none">
 				<form onSubmit={handleSubmit}>
 					<label htmlFor="name">name</label>

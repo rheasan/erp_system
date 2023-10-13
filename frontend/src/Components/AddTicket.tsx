@@ -26,7 +26,7 @@ const AddTicket = () => {
 	};
 
 	return (
-		<div className="p-4 bg-gray-800 text-white">
+		<div className="p-4 bg-gray-800 text-white h-full w-full">
 			<form onSubmit={handleSubmit}>
 				<label htmlFor="user_id">User ID</label>
 				<input type="text" name="user_id" />
