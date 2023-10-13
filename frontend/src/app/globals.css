@@ -3,54 +3,55 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+	scrollbar-width: thin;
+	--foreground-rgb: 0, 0, 0;
+	--background-start-rgb: 214, 219, 220;
+	--background-end-rgb: 255, 255, 255;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+	:root {
+		--foreground-rgb: 255, 255, 255;
+		--background-start-rgb: 0, 0, 0;
+		--background-end-rgb: 0, 0, 0;
+	}
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+	color: rgb(var(--foreground-rgb));
+	background: linear-gradient(
+			to bottom,
+			transparent,
+			rgb(var(--background-end-rgb))
+		)
+		rgb(var(--background-start-rgb));
 }
 
 label {
-  font-size: 1.2em;
-  font-weight: 400;
+	font-size: 1.2em;
+	font-weight: 400;
 }
 
 legend {
-  font-size: 1.2em;
-  font-weight: 400;
+	font-size: 1.2em;
+	font-weight: 400;
 }
 
 form {
-  border-bottom: 2px black;
+	border-bottom: 2px black;
 }
 
 input[type="text"] {
-  background-color: white;
-  color:black;
-  height: 2em;
-  padding-inline: 0.5em;
+	background-color: white;
+	color: black;
+	height: 2em;
+	padding-inline: 0.5em;
 }
 
 input {
-  margin: 5px;
+	margin: 5px;
 }
-button[type="submit"]{
-  padding: 2px;
-  font-size:1.5em;
+button[type="submit"] {
+	padding: 2px;
+	font-size: 1.5em;
 }

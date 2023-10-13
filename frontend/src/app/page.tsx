@@ -13,6 +13,7 @@ enum current_component {
 	GenerateTimetable,
 	Home,
 }
+
 export default function Home() {
 	const [currentState, setCurrentState] = useState(current_component.Home);
 
@@ -22,14 +23,16 @@ export default function Home() {
 			<div className="h-4/5 flex flex-row grow">
 				<Sidebar change_state={setCurrentState} states={current_component} />
 				<div className="w-4/5">
-					{currentState == current_component.Home && 
+					{currentState == current_component.Home && (
 						<div className="h-full w-full bg-gray-800 text-white flex justify-center items-center">
 							<p className="text-4xl">ERP System</p>
-						</div>	
-					}
+						</div>
+					)}
 					{currentState == current_component.AddProcess && <AddProcess />}
 					{currentState == current_component.AddTicket && <AddTicket />}
-					{currentState == current_component.GenerateTimetable && <GenerateTimetable />}
+					{currentState == current_component.GenerateTimetable && (
+						<GenerateTimetable />
+					)}
 				</div>
 			</div>
 			<Footer />
