@@ -1,11 +1,11 @@
 "use client";
 import Image from "next/image";
-import TopNavigation from "../Components/TopNavigation";
-import Sidebar from "../Components/Sidebar";
-import Footer from "../Components/Footer";
-import AddProcess from "@/Components/AddProcess";
-import AddTicket from "@/Components/AddTicket";
-import GenerateTimetable from "@/Components/GenerateTimetable";
+import TopNavigation from "../components/TopNavigation";
+import Sidebar from "../components/Sidebar";
+import Footer from "../components/Footer";
+import AddProcess from "@/components/AddProcess";
+import AddTicket from "@/components/AddTicket";
+import GenerateTimetable from "@/components/GenerateTimetable";
 import { useState } from "react";
 enum current_component {
 	AddTicket,
