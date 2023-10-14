@@ -18,7 +18,7 @@ export default function Home() {
 	const [currentState, setCurrentState] = useState(current_component.Home);
 
 	return (
-		<main className="flex min-h-screen flex-col h-full w-full m-0">
+		<main className="flex h-screen flex-col w-full m-0">
 			<TopNavigation />
 			<div className="h-4/5 flex flex-row grow w-full">
 				<Sidebar change_state={setCurrentState} states={current_component} />

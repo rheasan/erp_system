@@ -1,5 +1,6 @@
 "use client";
 import { FormEvent, useState } from "react";
+import JobComponent from "./JobComponent";
 
 type Job = {
 	name: string;
@@ -13,6 +14,7 @@ type Process = {
 };
 const AddProcess = () => {
 	const [jobs, setJobs] = useState<Job[]>([{ name: "", commands: [""] }]);
+	const [jobCount, setJobCount] = useState(1);
 	const [selectedJobs, setSelectedJobs] = useState<Job[]>([]);
 	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -41,20 +43,19 @@ const AddProcess = () => {
 		console.log(data);
 		console.log(parsed_data);
 	};
-	const addCommandToJob = () => {};
 
 	return (
-		<div className="flex flex-row h-full w-full">
-			<div className="p-4 bg-gray-800 text-white w-1/2 overflow-y-scroll overscroll-none">
+		<div className="flex flex-row max-h-full h-full w-full">
+			<div className="p-4 bg-gray-800 text-white w-1/2 overflow-y-auto max-h-full">
 				<form onSubmit={handleSubmit}>
-					<label htmlFor="name">name</label>
-					<input type="text" name="name" />
-					<br />
-					<label htmlFor="desc">desc</label>
-					<input type="text" name="desc" />
-					<br />
-					<label htmlFor="id">id</label>
-					<input type="text" name="id" />
+					<div className="grid grid-rows-2">
+						<label htmlFor="name">name</label>
+						<input type="text" name="name" />
+						<label htmlFor="desc">desc</label>
+						<input type="text" name="desc" />
+						<label htmlFor="id">id</label>
+						<input type="text" name="id" />
+					</div>
 					<br />
 					<div className="flex flex-row justify-around">
 						<p>Jobs</p>
@@ -79,29 +80,9 @@ const AddProcess = () => {
 								>
 									<div className="flex flex-row justify-around">
 										<p>Job {i}</p>
-										<button
-											onClick={() => {
-												const new_jobs = [...selectedJobs];
-												new_jobs[i].commands.push("");
-												setSelectedJobs(new_jobs);
-											}}
-										>
-											Add Process
-										</button>
-										<button
-											onClick={() => {
-												if (selectedJobs[i].commands.length > 0) {
-													const new_jobs = [...selectedJobs];
-													new_jobs[i].commands.pop();
-													setSelectedJobs(new_jobs);
-												}
-											}}
-										>
-											Remove Process
-										</button>
 									</div>
 									<label htmlFor={`job${i}`}>name</label>
-									<input type="text" name={`job${i}`} />
+									<input type="text" name={`job${i}`} defaultValue={e.name} disabled/>
 									{e.commands.map((command, i2) => {
 										return (
 											<div key={`${i}_${i2}`}>
@@ -112,6 +93,7 @@ const AddProcess = () => {
 													type="text"
 													name={`job${i}_command${i2}`}
 													defaultValue={command}
+													disabled
 												/>
 											</div>
 										);
@@ -123,91 +105,31 @@ const AddProcess = () => {
 					<button type="submit">Submit</button>
 				</form>
 			</div>
-			<div className="p-4 bg-gray-800 text-white overflow-y-scroll overscroll-none w-1/2">
-				<div className="flex flex-row justify-around">
+			<div className="p-4 bg-gray-800 text-white w-1/2 ">
+				<div className="flex flex-row justify-around border-black border-2">
 					<p>Jobs</p>
 					<div
 						onClick={() => {
-							setJobs([...jobs, { name: "", commands: [""] } as Job]);
+							const l=jobCount;
+							setJobCount(l+1);
 						}}
 					>
 						+
 					</div>
 					<div
 						onClick={() => {
-							if (jobs.length > 0) {
-								const new_jobs = [...jobs];
-								new_jobs.pop();
-								setJobs(new_jobs);
+							if (jobCount > 0) {
+								const l=jobCount;
+								setJobCount(l-1);
 							}
 						}}
 					>
 						-
 					</div>
 				</div>
-				<div>
-					{jobs.map((e, i) => {
-						return (
-							<div
-								key={i}
-								className="flex flex-col gap-0.5 border-black border-2 m-1 p-2"
-							>
-								<div>
-									<div className="flex flex-row justify-around">
-										<p>Job {i}</p>
-										{/* <button
-											onClick={() => {
-												const new_jobs = [...jobs];
-												new_jobs[i].commands.push("");
-												setJobs(new_jobs);
-											}}
-										>
-											+
-										</button> */}
-										<button
-											onClick={() => {
-												if (jobs[i].commands.length > 0) {
-													const new_jobs = [...jobs];
-													new_jobs[i].commands.pop();
-													setJobs(new_jobs);
-												}
-											}}
-										>
-											-
-										</button>
-									</div>
-									<label htmlFor={`job${i}`}>name</label>
-									<input type="text" name={`job${i}`} />
-									{e.commands.map((command, i2) => {
-										return (
-											<div key={`${i}_${i2}`}>
-												<label htmlFor={`job${i}_command${i2}`}>
-													Command {i2}
-												</label>
-												<input
-													type="text"
-													name={`job${i}_command${i2}`}
-													defaultValue={command}
-												/>
-											</div>
-										);
-									})}
-									<select
-										id="Permissions"
-										className="text-black w-full"
-										onChange={(e) => {}}
-									>
-										<option value="Director">Director</option>
-										<option value="Adean">Adean</option>
-										<option value="HOD">HOD</option>
-										<option value="Admin">Admin</option>
-									</select>
-								</div>
-								<button className="text-green-500 border-solid border-2 border-green-500 hover:text-white hover:bg-green-500">
-									Add
-								</button>
-							</div>
-						);
+				<div className="max-h-full overflow-y-auto">
+					{Array(jobCount).fill(0).map((_, i) => {
+						return (<JobComponent key={i} index={i} selectedJobs={selectedJobs} setSelectedJobs={setSelectedJobs}/>);
 					})}
 				</div>
 			</div>
