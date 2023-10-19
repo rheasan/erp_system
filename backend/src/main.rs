@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .route("/process", get(process::get_processes))
     .route("/process", post(process::create_process));
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     println!("Running on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
