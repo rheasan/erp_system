@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use sqlx::postgres::PgPoolOptions;
 
 pub mod process;
+pub mod users;
 pub mod roles;
 pub mod db_types;
 
@@ -23,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.route("/", get(say_hello))
 		.route("/process", get(process::get_processes))
 		.route("/process", post(process::create_process))
+		.route("/users", post(users::create_user))
 		.route("/roles", post(roles::create_role))
 		.with_state(pool);
 
