@@ -1,6 +1,9 @@
-use axum::{routing::{get, post}, Router};
+use axum::{routing::{get, post}, Router, http::{Method, HeaderValue}};
 use std::net::SocketAddr;
 use sqlx::postgres::PgPoolOptions;
+use tower_http::cors::CorsLayer;
+use axum::http::header::CONTENT_TYPE;
+use dotenv;
 
 pub mod process;
 pub mod users;
@@ -9,8 +12,16 @@ pub mod db_types;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+	dotenv::dotenv().ok();
+
 	let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
 	let port = port.parse::<u16>().unwrap();
+
+	let cors = CorsLayer::new()
+		.allow_headers([CONTENT_TYPE])
+		.allow_methods([Method::GET, Method::POST])
+		.allow_origin(std::env::var("FRONTEND_URL")?.parse::<HeaderValue>().unwrap());
 
 	let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not defined");
 
@@ -26,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.route("/process", post(process::create_process))
 		.route("/users", post(users::create_user))
 		.route("/roles", post(roles::create_role))
+		.layer(cors)
 		.with_state(pool);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
