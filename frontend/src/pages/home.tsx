@@ -6,11 +6,13 @@ import AddProcess from "@/components/AddProcess";
 import AddTicket from "@/components/AddTicket";
 import GenerateTimetable from "@/components/GenerateTimetable";
 import { useState } from "react";
+import DashBoard from "@/components/DashBoard/DashBoard";
 enum current_component {
 	AddTicket,
 	AddProcess,
 	GenerateTimetable,
 	Home,
+	DashBoard
 }
 
 export default function Home() {
@@ -29,9 +31,8 @@ export default function Home() {
 					)}
 					{currentState == current_component.AddProcess && <AddProcess />}
 					{currentState == current_component.AddTicket && <AddTicket />}
-					{currentState == current_component.GenerateTimetable && (
-						<GenerateTimetable />
-					)}
+					{currentState == current_component.GenerateTimetable && <GenerateTimetable />}
+					{currentState == current_component.DashBoard && <DashBoard />}
 				</div>
 			</div>
 			<Footer />

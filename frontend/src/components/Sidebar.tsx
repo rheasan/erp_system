@@ -5,7 +5,7 @@ const Sidebar = (props: any) => {
 	return (
 		<div className="sidebar bg-gray-900 text-white w-1/5 border-r-2 border-black, flex flex-col items-center text-2xl">
 			<div>
-				<button onClick={() => change_state(states.Home)}>DashBoard</button>
+				<button onClick={() => change_state(states.DashBoard)}>DashBoard</button>
 			</div>
 			<div>
 				<button onClick={() => change_state(states.Home)}>Profile</button>
