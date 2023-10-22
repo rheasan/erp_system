@@ -37,6 +37,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.route("/process", post(process::create_process))
 		.route("/users", post(users::create_user))
 		.route("/roles", post(roles::create_role))
+		.route("/new_user", post(users::register_new_user))
+		.route("/new_user", get(users::check_user_approved))
 		.layer(cors)
 		.with_state(pool);
 

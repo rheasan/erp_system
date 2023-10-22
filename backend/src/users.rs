@@ -1,5 +1,5 @@
 use axum::{http::StatusCode, Json, extract};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, QueryBuilder, Postgres};
 use uuid::Uuid;
 use crate::db_types::{User, Role};
@@ -10,6 +10,23 @@ pub struct CreateUser {
 	username: String,
 	email: Option<String>,
 	roles: Vec<String>	
+}
+
+#[derive(Deserialize)]
+pub struct RegisterNewUser {
+	username: String,
+}
+
+#[derive(Serialize)]
+pub struct UserApprovedMsg {
+	pub status: bool
+}
+impl UserApprovedMsg {
+	fn get(status: bool) -> UserApprovedMsg {
+		return UserApprovedMsg {
+			status
+		};
+	}
 }
 
 impl CreateUser {
@@ -67,4 +84,46 @@ pub async fn create_user(
 	}
 
 	return Ok((StatusCode::CREATED, Json(user.userid)));
+}
+
+pub async fn register_new_user(
+	extract::State(pool) : extract::State<PgPool>,
+	Json(payload) : Json<RegisterNewUser>
+) -> Result<StatusCode, StatusCode> {
+	let username = payload.username;
+	let query = sqlx::query("insert into new_users values ($1)")
+		.bind(&username)
+		.execute(&pool)
+		.await;
+
+	if let Err(e) = query {
+		eprintln!("Error registering new user: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	return Ok(StatusCode::OK);
+}
+
+
+pub async fn check_user_approved(
+	extract::State(pool) : extract::State<PgPool>,
+	payload : extract::Query<RegisterNewUser>
+) -> Result<(StatusCode, Json<UserApprovedMsg>), StatusCode> {
+
+	let username = payload.0.username;
+	let query = sqlx::query("select * from new_users where username=$1")
+		.bind(&username)
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = query {
+		eprintln!("Error checking new user status: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+	let query = query.unwrap();
+	if query.len() == 0 {
+		return Ok((StatusCode::OK, Json(UserApprovedMsg::get(true))));
+	}
+
+	return Ok((StatusCode::OK, Json(UserApprovedMsg::get(false))));
 }
