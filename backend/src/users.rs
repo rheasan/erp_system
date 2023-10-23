@@ -17,10 +17,20 @@ pub struct RegisterNewUser {
 	username: String,
 }
 
+
 #[derive(Serialize)]
 pub struct UserApprovedMsg {
 	pub status: bool
 }
+#[derive(Deserialize)]
+pub struct IsAdminReq {
+	username: String,
+}
+#[derive(Serialize)]
+pub struct IsAdminRes {
+	value: bool 
+}
+
 impl UserApprovedMsg {
 	fn get(status: bool) -> UserApprovedMsg {
 		return UserApprovedMsg {
@@ -126,4 +136,30 @@ pub async fn check_user_approved(
 	}
 
 	return Ok((StatusCode::OK, Json(UserApprovedMsg::get(false))));
+}
+
+pub async fn is_admin(
+	payload : extract::Query<IsAdminReq>,
+	extract::State(pool) : extract::State<PgPool>
+) -> Result<(StatusCode, Json<IsAdminRes>), StatusCode> {
+
+	let username = payload.0.username;
+	let query = sqlx::query("select role_ from users u join roles r on u.userid = r.userid where u.username=$1 and role_='admin'")
+		.bind(&username)
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = query {
+		eprintln!("Error in is_admin: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+	
+	let query = query.unwrap();
+
+	// query should only return 0 or 1 results. you cant add same role twice for same user.
+	if query.len() == 1 {
+		return Ok((StatusCode::OK, Json(IsAdminRes {value: true})));
+	}
+
+	return Ok((StatusCode::OK, Json(IsAdminRes { value: false })));
 }

@@ -36,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.route("/process", get(process::get_processes))
 		.route("/process", post(process::create_process))
 		.route("/users", post(users::create_user))
+		.route("/is_admin", get(users::is_admin))
 		.route("/roles", post(roles::create_role))
 		.route("/new_user", post(users::register_new_user))
 		.route("/new_user", get(users::check_user_approved))
