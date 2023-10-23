@@ -6,10 +6,10 @@ import AddProcess from "@/components/AddProcess";
 import AddTicket from "@/components/AddTicket";
 import GenerateTimetable from "@/components/GenerateTimetable";
 import { useEffect, useState } from "react";
-import DashBoard from "@/components/DashBoard/DashBoard";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/router";
 import toast from "react-hot-toast";
+import DashBoard from "@/components/DashBoard/DashBoard";
 enum current_component {
 	AddTicket,
 	AddProcess,
