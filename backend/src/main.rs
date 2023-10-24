@@ -38,6 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.route("/users", post(users::create_user))
 		.route("/is_admin", get(users::is_admin))
 		.route("/roles", post(roles::create_role))
+		.route("/get_all_roles", get(roles::get_all_roles))
 		.route("/new_user", post(users::register_new_user))
 		.route("/new_user", get(users::check_user_approved))
 		.layer(cors)

@@ -13,8 +13,19 @@ pub struct CreateUser {
 }
 
 #[derive(Deserialize)]
+// TODO: roles should be an array that is added directly to the new_users table after verification of roles
 pub struct RegisterNewUser {
 	username: String,
+	roles: String,
+	email: String,
+}
+#[derive(Deserialize)]
+pub struct CheckUserApproved {
+	username: String
+}
+#[derive(sqlx::FromRow, Debug)]
+pub struct CountQuery {
+	count: i64
 }
 
 
@@ -101,8 +112,33 @@ pub async fn register_new_user(
 	Json(payload) : Json<RegisterNewUser>
 ) -> Result<StatusCode, StatusCode> {
 	let username = payload.username;
-	let query = sqlx::query("insert into new_users values ($1)")
+	let roles = payload.roles;
+	let email = payload.email;
+
+	// check if the user has already registered;
+	let check_user_query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from (select username from new_users where username='erp_admin' union select username from users where username='erp_admin')")
 		.bind(&username)
+		.bind(&username)
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = check_user_query {
+		eprintln!("Error in register_new_user, username: {}, : {}", username, e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	let check_user_query = check_user_query.unwrap();
+
+	if check_user_query[0].count != 0 {
+		eprintln!("Error in register_new_user, username: {}", username);
+		return Err(StatusCode::CONFLICT);
+	}
+
+	// insert into new_users
+	let query = sqlx::query("insert into new_users (username, roles, email) values ($1, $2, $3)")
+		.bind(&username)
+		.bind(&roles)
+		.bind(&email)
 		.execute(&pool)
 		.await;
 
@@ -117,11 +153,11 @@ pub async fn register_new_user(
 
 pub async fn check_user_approved(
 	extract::State(pool) : extract::State<PgPool>,
-	payload : extract::Query<RegisterNewUser>
+	payload : extract::Query<CheckUserApproved>
 ) -> Result<(StatusCode, Json<UserApprovedMsg>), StatusCode> {
 
 	let username = payload.0.username;
-	let query = sqlx::query("select * from new_users where username=$1")
+	let query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from new_users where username=$1")
 		.bind(&username)
 		.fetch_all(&pool)
 		.await;
@@ -131,9 +167,9 @@ pub async fn check_user_approved(
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	let query = query.unwrap();
-	if query.len() == 0 {
+	if query[0].count == 0 {
 		return Ok((StatusCode::OK, Json(UserApprovedMsg::get(true))));
-	}
+	}	
 
 	return Ok((StatusCode::OK, Json(UserApprovedMsg::get(false))));
 }

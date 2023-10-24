@@ -6,7 +6,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return res.status(400).end();
 	}
 
-	const body = req.body as {username: string};
+	const body = req.body as {username: string, email: string, roles: string};
 	const endpoint = new URL(process.env.BACKEND_URL + "/new_user");
 	const response = await fetch(endpoint, {
 		method: 'POST',
@@ -16,8 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		body: JSON.stringify(body)
 	})
 	.then((response) => {
-		if(response.status === 200){
-			return 200;	
+		if(response.status === 200 || response.status === 409){
+			return response.status;	
 		}
 		else{
 			return 500;
