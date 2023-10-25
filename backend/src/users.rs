@@ -6,7 +6,7 @@ use sqlx::{PgPool, QueryBuilder, Postgres};
 pub struct CreateUser {
 	username: String,
 }
-#[derive(Deserialize, sqlx::FromRow, Clone)]
+#[derive(Deserialize, sqlx::FromRow, Clone, Serialize)]
 pub struct NewUser {
 	username: String,
 	roles: String,
@@ -234,8 +234,20 @@ pub async fn is_admin(
 
 	return Ok((StatusCode::OK, Json(IsAdminRes { value: false })));
 }
-pub fn approve_new_user() {
-	/*
 
-	*/
+pub async fn get_all_new_users(
+	extract::State(pool) : extract::State<PgPool>
+) -> Result<(StatusCode, Json<Vec<NewUser>>), StatusCode> {
+
+	let query : Result<Vec<NewUser>, _> = sqlx::query_as("select * from new_users")
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = query {
+		eprintln!("Error fetching new users at get_all_new_users. e: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	let query = query.unwrap();
+	return Ok((StatusCode::OK, Json(query)));
 }
