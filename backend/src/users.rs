@@ -1,15 +1,16 @@
 use axum::{http::StatusCode, Json, extract};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, QueryBuilder, Postgres};
-use uuid::Uuid;
-use crate::db_types::{User, Role};
-
 
 #[derive(Deserialize)]
 pub struct CreateUser {
 	username: String,
-	email: Option<String>,
-	roles: Vec<String>	
+}
+#[derive(Deserialize, sqlx::FromRow, Clone)]
+pub struct NewUser {
+	username: String,
+	roles: String,
+	email: String
 }
 
 #[derive(Deserialize)]
@@ -50,36 +51,36 @@ impl UserApprovedMsg {
 	}
 }
 
-impl CreateUser {
-	fn gen_user_and_roles(&self) -> (User, Vec<Role>) {
-		let id = Uuid::new_v4();
-		let user = User {
-			userid: id,
-			username: self.username.clone(),
-			email: self.email.clone(),
-		};
-		let roles = self.roles.iter().map(|r| 
-			Role {
-				userid: id,
-				role_: r.to_string(),
-			}
-		).collect::<Vec<Role>>();
-
-		return (user, roles);
-	}
-}
 
 pub async fn create_user(
 	extract::State(pool) : extract::State<PgPool>,
 	Json(payload) : Json<CreateUser>
-) -> Result<(StatusCode, Json<uuid::Uuid>), StatusCode> {
-	let (user, roles) = payload.gen_user_and_roles();
+) -> Result<StatusCode, StatusCode> {
+	// TODO: do all steps as a part of transaction!!!
+
+	let username = payload.username;
+
+	// get the userdata from new_users
+	let new_user_query : Result<Vec<NewUser>, _> = sqlx::query_as("select * from new_users where username=$1")
+		.bind(&username)
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = new_user_query {
+		eprintln!("Failed to get existing user data at create_user, username: {}, e: {}", username, e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	let new_user = new_user_query.unwrap()[0].clone();
+
+	// insert the new_user into users table
+	let userid = uuid::Uuid::new_v4();
 
 	let insert_into_user = 
 		sqlx::query("insert into users (userid, username, email) values ($1, $2, $3)")
-		.bind(&user.userid)
-		.bind(&user.username)
-		.bind(&user.email)
+		.bind(&userid)
+		.bind(&new_user.username)
+		.bind(&new_user.email)
 		.execute(&pool)
 		.await;
 
@@ -88,23 +89,53 @@ pub async fn create_user(
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	
+	// insert roles
+	// verify correct roles
+	let roles = new_user.roles.split(",").map(|r| r.trim()).collect::<Vec<_>>();
+	let role_query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from role_defs where role_ in (select * from unnest($1::varchar[]))")
+		.bind(&roles)
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = role_query {
+		eprintln!("Error in register_new_user in role_checking: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	let role_query = role_query.unwrap();
+	
+	if role_query[0].count != roles.len() as i64 {
+		eprintln!("Error in create_new_user. Request contains non-existing roles: username: {}", username);
+		return Err(StatusCode::CONFLICT);
+	}
 
 	// !!!! look at the trailing space
 	let mut role_query_builder : QueryBuilder<Postgres> = QueryBuilder::new("insert into roles (userid, role_) ");
 	let insert_roles_query = 
 		role_query_builder.
 		push_values(roles.iter(), |mut b, role| {
-			b.push_bind(user.userid)
-			.push_bind(role.role_.clone());
+			b.push_bind(&userid)
+			.push_bind(role);
 		})
 		.build();
 
 	if let Err(e) = insert_roles_query.execute(&pool).await {
 		eprintln!("Error inserting roles in create_user: {}", e);
+		return Err(StatusCode::CONFLICT);
+	}
+
+	// remove user from new_users
+	let query = sqlx::query("delete from new_users where username=$1")
+		.bind(&username)
+		.execute(&pool)
+		.await;
+
+	if let Err(e) = query {
+		eprintln!("Error removing user from new_users. username: {}, e: {}", username, e);
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
-	return Ok((StatusCode::CREATED, Json(user.userid)));
+	return Ok(StatusCode::CREATED);
 }
 
 pub async fn register_new_user(
@@ -202,20 +233,6 @@ pub async fn is_admin(
 }
 pub fn approve_new_user() {
 	/*
-	// verify correct roles
-	let role_query : Result<Vec<RoleQuery>, _> = sqlx::query_as("select count(*) from role_defs where role_ in (select role_ from unnest($1::varchar[]))")
-		.bind(&roles)
-		.fetch_all(&pool)
-		.await;
 
-	if let Err(e) = role_query {
-		eprintln!("Error in register_new_user in role_checking: {}", e);
-		return Err(StatusCode::INTERNAL_SERVER_ERROR);
-	}
-
-	let role_query = role_query.unwrap();
-	if role_query[0].count != roles.len() {
-		eprintln!("roles")
-	}
 	*/
 }
