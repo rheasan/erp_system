@@ -160,7 +160,6 @@ pub async fn register_new_user(
 
 	let check_user_query = check_user_query.unwrap();
 
-	println!("query: {:?}", check_user_query[0]);
 	if check_user_query[0].count != 0 {
 		eprintln!("Error in register_new_user, username: {}", username);
 		return Err(StatusCode::CONFLICT);
