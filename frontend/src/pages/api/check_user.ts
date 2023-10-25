@@ -7,7 +7,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 	const query = req.query.username;
 	
-	const endpoint = new URL(process.env.BACKEND_URL + "/new_user?username=" + query);
+	const endpoint = new URL(process.env.BACKEND_URL + "/new_user_approved?username=" + query);
 	const msg = await fetch(endpoint)
 	.then((response) => {
 		if(response.status != 200){
