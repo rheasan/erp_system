@@ -116,7 +116,7 @@ pub async fn register_new_user(
 	let email = payload.email;
 
 	// check if the user has already registered;
-	let check_user_query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from (select username from new_users where username='erp_admin' union select username from users where username='erp_admin')")
+	let check_user_query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from (select un.username from new_users un where username=$1 union select u.username from users u where username=$2)")
 		.bind(&username)
 		.bind(&username)
 		.fetch_all(&pool)
@@ -129,6 +129,7 @@ pub async fn register_new_user(
 
 	let check_user_query = check_user_query.unwrap();
 
+	println!("query: {:?}", check_user_query[0]);
 	if check_user_query[0].count != 0 {
 		eprintln!("Error in register_new_user, username: {}", username);
 		return Err(StatusCode::CONFLICT);
@@ -198,4 +199,23 @@ pub async fn is_admin(
 	}
 
 	return Ok((StatusCode::OK, Json(IsAdminRes { value: false })));
+}
+pub fn approve_new_user() {
+	/*
+	// verify correct roles
+	let role_query : Result<Vec<RoleQuery>, _> = sqlx::query_as("select count(*) from role_defs where role_ in (select role_ from unnest($1::varchar[]))")
+		.bind(&roles)
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = role_query {
+		eprintln!("Error in register_new_user in role_checking: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	let role_query = role_query.unwrap();
+	if role_query[0].count != roles.len() {
+		eprintln!("roles")
+	}
+	*/
 }
