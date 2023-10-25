@@ -116,7 +116,7 @@ pub async fn register_new_user(
 	let email = payload.email;
 
 	// check if the user has already registered;
-	let check_user_query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from (select un.username from new_users un where username=$1 union select u.username from users u where username=$2)")
+	let check_user_query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from (select un.username from new_users un where username=$1 union select u.username from users u where username=$2) all_users")
 		.bind(&username)
 		.bind(&username)
 		.fetch_all(&pool)
