@@ -56,14 +56,14 @@ pub async fn create_user(
 	extract::State(pool) : extract::State<PgPool>,
 	Json(payload) : Json<CreateUser>
 ) -> Result<StatusCode, StatusCode> {
-	// TODO: do all steps as a part of transaction!!!
-
+	let mut tx = pool.begin().await.unwrap();
 	let username = payload.username;
 
 	// get the userdata from new_users
 	let new_user_query : Result<Vec<NewUser>, _> = sqlx::query_as("select * from new_users where username=$1")
 		.bind(&username)
-		.fetch_all(&pool)
+		// TODO: why is tx dereferenced ?????????
+		.fetch_all(&mut *tx)
 		.await;
 
 	if let Err(e) = new_user_query {
@@ -81,7 +81,7 @@ pub async fn create_user(
 		.bind(&userid)
 		.bind(&new_user.username)
 		.bind(&new_user.email)
-		.execute(&pool)
+		.execute(&mut *tx)
 		.await;
 
 	if let Err(e) = insert_into_user {
@@ -94,7 +94,7 @@ pub async fn create_user(
 	let roles = new_user.roles.split(",").map(|r| r.trim()).collect::<Vec<_>>();
 	let role_query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from role_defs where role_ in (select * from unnest($1::varchar[]))")
 		.bind(&roles)
-		.fetch_all(&pool)
+		.fetch_all(&mut *tx)
 		.await;
 
 	if let Err(e) = role_query {
@@ -119,7 +119,7 @@ pub async fn create_user(
 		})
 		.build();
 
-	if let Err(e) = insert_roles_query.execute(&pool).await {
+	if let Err(e) = insert_roles_query.execute(&mut *tx).await {
 		eprintln!("Error inserting roles in create_user: {}", e);
 		return Err(StatusCode::CONFLICT);
 	}
@@ -127,14 +127,18 @@ pub async fn create_user(
 	// remove user from new_users
 	let query = sqlx::query("delete from new_users where username=$1")
 		.bind(&username)
-		.execute(&pool)
+		.execute(&mut *tx)
 		.await;
 
 	if let Err(e) = query {
 		eprintln!("Error removing user from new_users. username: {}, e: {}", username, e);
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
-
+	let result = tx.commit().await;
+	if let Err(e) = result {
+		eprintln!("failed to commit transaction in create_user, username: {}, e: {}", username, e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
 	return Ok(StatusCode::CREATED);
 }
 
