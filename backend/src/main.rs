@@ -9,6 +9,7 @@ pub mod process;
 pub mod users;
 pub mod roles;
 pub mod db_types;
+pub mod ticket;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
 		.route("/", get(say_hello))
-		.route("/process", get(process::get_processes))
+		.route("/get_all_processes", get(process::get_all_processes))
 		.route("/process", post(process::create_process))
 		.route("/users", post(users::create_user))
 		.route("/is_admin", get(users::is_admin))
