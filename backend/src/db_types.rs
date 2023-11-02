@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use uuid;
+use sqlx::FromRow;
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
@@ -22,13 +23,23 @@ pub struct Role {
 	pub role_: String,
 }
 
+#[derive(Clone, Serialize, Deserialize, FromRow, Debug)]
 pub struct Ticket {
+	pub id: i32,
 	pub owner_id: uuid::Uuid,
 	pub current_user_id: uuid::Uuid,
-	process_id: String,
-	current_step: u32,
-	log_id: uuid::Uuid,
-	is_public: bool,
-	created_at: chrono::DateTime<chrono::Utc>,
-	updated_at: chrono::DateTime<chrono::Utc>
+	pub process_id: String,
+	pub current_step: i32,
+	pub log_id: uuid::Uuid,
+	pub is_public: bool,
+	pub created_at: chrono::DateTime<chrono::Utc>,
+	pub updated_at: chrono::DateTime<chrono::Utc>,
+	pub status: String,
+}
+
+impl Ticket {
+	pub fn update(&mut self) {
+		self.current_step = self.current_step + 1;
+		self.updated_at = chrono::Utc::now();
+	}
 }

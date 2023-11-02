@@ -43,6 +43,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.route("/new_user", post(users::register_new_user))
 		.route("/new_user", get(users::get_all_new_users))
 		.route("/new_user_approved", get(users::check_user_approved))
+		.route("/ticket", post(ticket::create_ticket))
+		.route("/update_ticket", post(ticket::update_ticket))
 		.layer(cors)
 		.with_state(pool);
 
