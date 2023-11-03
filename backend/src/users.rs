@@ -51,6 +51,15 @@ impl UserApprovedMsg {
 	}
 }
 
+#[derive(Deserialize)]
+pub struct GetUserId {
+	username: String
+}
+#[derive(Deserialize, Serialize, sqlx::FromRow)]
+pub struct UserIdQuery {
+	userid: Option<uuid::Uuid>
+}
+
 
 pub async fn create_user(
 	extract::State(pool) : extract::State<PgPool>,
@@ -249,5 +258,26 @@ pub async fn get_all_new_users(
 	}
 
 	let query = query.unwrap();
+	return Ok((StatusCode::OK, Json(query)));
+}
+#[axum::debug_handler]
+pub async fn get_userid(
+	extract::State(pool) : extract::State<PgPool>,
+	payload : extract::Query<GetUserId>
+) -> Result<(StatusCode, Json<UserIdQuery>), StatusCode> {
+
+	let username = payload.0.username;
+	let query : Result<UserIdQuery, _> = sqlx::query_as("select userid from users where username=$1")
+		.bind(&username)
+		.fetch_one(&pool)
+		.await;
+
+	if let Err(e) = query {
+		eprintln!("Error fetching userid at get_userid. e: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	let query = query.unwrap();
+
 	return Ok((StatusCode::OK, Json(query)));
 }
