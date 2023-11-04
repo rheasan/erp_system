@@ -2,9 +2,9 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import logo from "../assets/logo.jpg";
-import { SignOutButton, useAuth } from "@clerk/nextjs";
+import { SignOutButton, useUser } from "@clerk/nextjs";
 const TopNavigation = () => {
-	const {isSignedIn, isLoaded} = useAuth();
+	const {isSignedIn, isLoaded, user} = useUser();
 
 	return (
 		<div className="top-navigation bg-blue-500 flex flex-row h-12 justify-between items-center gap-4">
@@ -25,7 +25,8 @@ const TopNavigation = () => {
 						}
 						{
 							isSignedIn && (
-								<div>
+								<div className="flex flex-row items-center gap-2">
+									<p>Logged in as {user?.username}</p>
 									<SignOutButton />
 								</div>
 							)

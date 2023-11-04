@@ -46,6 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.route("/new_user_approved", get(users::check_user_approved))
 		.route("/ticket", post(ticket::create_ticket))
 		.route("/update_ticket", post(ticket::update_ticket))
+		.route("/get_user_tickets", post(ticket::get_user_tickets))
 		.layer(cors)
 		.with_state(pool);
 

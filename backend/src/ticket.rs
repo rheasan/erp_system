@@ -24,7 +24,25 @@ pub struct UpdateTicket {
 pub struct UserIdQueryRes {
 	userid: uuid::Uuid
 }
-
+#[derive(Serialize, Deserialize)]
+pub struct UserTicket {
+	pub id: i32,
+	pub owner_id: uuid::Uuid,
+	pub process_id: String,
+	pub is_public: bool,
+	pub created_at: chrono::DateTime<chrono::Utc>,
+	pub updated_at: chrono::DateTime<chrono::Utc>,
+	pub status: String,
+	pub is_current_user: bool
+}
+#[derive(Serialize, Deserialize)]
+pub struct GetUserTicketsRes {
+	pub tickets: Vec<UserTicket>
+}
+#[derive(Serialize, Deserialize)]
+pub struct GetUserTicketsReq {
+	pub userid: String 
+}
 
 pub async fn create_ticket(
 	extract::State(pool): extract::State<sqlx::PgPool>,
@@ -59,7 +77,10 @@ pub async fn update_ticket(
 ) -> Result<StatusCode, StatusCode> {
 	// if the ticket was rejected then set its status to false and return
 	if payload.status == false {
-		let query = sqlx::query("update tickets set status = 'rejected' where id = $1")
+		// current_user_id should also be set to the owner_id for loading in frontend
+		// FIXME: fix this so current_user_id doesnt have to be updated
+
+		let query = sqlx::query("update tickets set status = 'rejected', current_user_id=owner_id where id = $1")
 			.bind(&payload.ticket_id)
 			.execute(&pool)
 			.await;
@@ -98,10 +119,19 @@ pub async fn update_ticket(
 		TicketStatus::Closed => "complete",
 		TicketStatus::Rejected => unreachable!()
 	};
+	// if the ticket was completed then current_user_id should be set to owner_id
+	let new_current_user: uuid::Uuid;
+	if result == "complete" {
+		new_current_user = ticket.owner_id.clone();
+	}
+	else{
+		new_current_user = ticket.current_user_id.clone();
+	}
+
 	// update the ticket with new values;
 	// FIXME: this query should be updated when new events are added
 	let query = sqlx::query("update tickets set current_user_id = $1, current_step = $2, updated_at = $3, status = $4 where id = $5")
-		.bind(&ticket.current_user_id)
+		.bind(&new_current_user)
 		.bind(&ticket.current_step)
 		.bind(&ticket.updated_at)
 		.bind(result)
@@ -181,4 +211,39 @@ async fn execute(ticket: &mut Ticket, transaction: &mut Transaction<'_, Postgres
 	}
 
 	return Ok(TicketStatus::Open);
+}
+
+pub async fn get_user_tickets (
+	extract::State(pool): extract::State<sqlx::PgPool>,
+	Json(payload) : Json<GetUserTicketsReq>
+) -> Result<(StatusCode, Json<GetUserTicketsRes>), StatusCode> {
+	let userid = payload.userid.clone();
+	let user_uuid = uuid::Uuid::parse_str(&userid).unwrap();
+
+	let query : Result<Vec<Ticket>, _> = sqlx::query_as("select * from tickets where owner_id=$1 or current_user_id=$1")
+		.bind(user_uuid)
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = query {
+		eprintln!("Error reading tickets from db: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+	let query = query.unwrap();
+
+	let result = query.iter().map(|e| {
+		UserTicket {
+			id: e.id,
+			// FIXME: this should give username instead of userid
+			owner_id: e.owner_id,
+			process_id: e.process_id.clone(),
+			is_public: e.is_public,
+			created_at: e.created_at,
+			updated_at: e.updated_at,
+			status: e.status.clone(),
+			is_current_user: e.current_user_id == user_uuid
+		}
+	}).collect::<Vec<UserTicket>>();
+
+	return Ok((StatusCode::OK, Json(GetUserTicketsRes { tickets: result })));
 }
