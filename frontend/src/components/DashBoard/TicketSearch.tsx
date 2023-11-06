@@ -18,12 +18,18 @@ type TicketCardProps = {
 	tickets?: Ticket[],
 	setTickets: React.Dispatch<React.SetStateAction<Ticket[] | null>>
 }
+type TicketState = {
+	completed: Ticket[],
+	open: Ticket[],
+	rejected: Ticket[]
+}
+
 const TicketCard = (props: TicketCardProps) => {
-	const {data, setTickets} = props;
+	const {data, setTickets, tickets} = props;
 
 	const updateTicket = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>, isApproved: boolean) => {
 		const button = e.target as HTMLButtonElement;
-		if(!data.is_current_user) {
+		if(data.is_current_user) {
 			button.disabled = true;
 		}
 		fetch("/api/update_ticket", {
@@ -41,8 +47,9 @@ const TicketCard = (props: TicketCardProps) => {
 				toast.success("Ticket updated successfully");
 				console.log(data.is_current_user);
 				if(!data.is_current_user){
-					const newTickets = props.tickets?.filter((ticket) => ticket.id !== data.id);
-					setTickets(newTickets!);
+					let newTicketState = structuredClone(tickets!);
+					newTicketState = newTicketState.filter((ticket) => ticket.id !== data.id);
+					setTickets(newTicketState);
 				}
 			}
 			else{
@@ -71,9 +78,49 @@ const TicketCard = (props: TicketCardProps) => {
 		</div>	
 	)
 }
+
+const TicketContainer = (props: {data: Ticket[] | null, type: keyof TicketState, username: string}) => {
+	const {data, type, username} = props;
+	const [tickets, setTickets] = useState<Ticket[] | null>(data);
+	const formattedType = type[0].toUpperCase() + type.slice(1);
+	return (
+		<div>
+			<h1 className="text-2xl">{formattedType} Tickets</h1>
+			{
+				tickets?.length === 0 && <p>No {formattedType} tickets</p>
+			}
+			{
+				tickets?.map((ticket) => {
+					return <TicketCard data={ticket} username={username} tickets={tickets} setTickets={setTickets} key={ticket.id} />
+				})
+			}
+		</div>
+	)
+}
+
 const TicketSearch = () => {
-	const [tickets, setTickets] = useState<Ticket[] | null>(null);
+	const [tickets, setTickets] = useState<TicketState | null>(null);
 	const {user} = useUser();
+
+	const splitTickets = (tickets: Ticket[]) => {
+		let res : TicketState = {
+			completed: [],
+			open: [],
+			rejected: []
+		};
+		for(let i = 0; i < tickets.length; i++){
+			if(tickets[i].status === "completed"){
+				res.completed.push(tickets[i]);
+			}
+			else if(tickets[i].status === "open"){
+				res.open.push(tickets[i]);
+			}
+			else{
+				res.rejected.push(tickets[i]);
+			}
+		}
+		return res;
+	}
 
 	const fetchAllTickets = () => {
 		fetch("/api/get_user_tickets", {
@@ -94,7 +141,7 @@ const TicketSearch = () => {
 			}
 		})
 		.then((data) => {
-			setTickets(data.tickets);
+			setTickets(splitTickets(data.tickets));
 		})
 		.catch(e => {
 			toast.error(e);
@@ -110,9 +157,12 @@ const TicketSearch = () => {
 				tickets === null && <p>No tickets found</p>
 			}
 			{
-				tickets !== null && tickets.map((ticket, i) => {
-					return <TicketCard data={ticket} key={i} username={user?.username!} setTickets={setTickets} tickets={tickets}/>
-				})
+				tickets !== null &&
+				<div className="flex flex-col gap-4">
+					<TicketContainer data={tickets.open} type={"open"} username={user?.username!} />	
+					<TicketContainer data={tickets.completed} type={"completed"} username={user?.username!} />	
+					<TicketContainer data={tickets.rejected} type={"rejected"} username={user?.username!} />	
+				</div>
 			}	
 		</div>
 	)

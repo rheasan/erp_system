@@ -6,7 +6,7 @@ import TicketSearch from "../TicketSearch";
 
 const AdminDashBoard = () => {
 	return (
-		<div className="h-full w-full flex flex-col bg-gray-800 p-4">
+		<div className="h-full w-full flex flex-col bg-gray-800 p-4 overflow-y-scroll">
 			<AddRole />
 			<ApproveNewUsers />
 			<TicketSearch />
