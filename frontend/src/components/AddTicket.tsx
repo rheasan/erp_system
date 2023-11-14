@@ -31,9 +31,8 @@ const AddTicket = () => {
 		e.preventDefault();
 		const form = e.target as HTMLFormElement;
 		const formData = Array.from(new FormData(form));
-		console.log(formData);
 		const data = {
-			process_id: selectedProcess,
+			process_id: selectedProcess.process_id,
 			is_public: formData[0][1] === "on",
 			username: user?.username
 		}
