@@ -471,12 +471,13 @@ fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process
 #[cfg(test)]
 mod ticket_tests {
     use crate::db_types::Ticket;
+	use dotenv;
 
     use super::{update_internal, NewUserTicketType};
 
-
 	#[tokio::test]
 	async fn check_2_node_process() {
+		dotenv::dotenv().ok();
 		let mut ticket = Ticket {
 			id: 0,
 			owner_id: uuid::Uuid::new_v4(),
@@ -502,6 +503,7 @@ mod ticket_tests {
 
 	#[tokio::test]
 	async fn check_approve_user_request_works() {
+		dotenv::dotenv().ok();
 		let mut ticket = Ticket {
 			id: 0,
 			owner_id: uuid::Uuid::new_v4(),
@@ -537,6 +539,7 @@ mod ticket_tests {
 	}
 	#[tokio::test]
 	async fn check_approve_node_works() {
+		dotenv::dotenv().ok();
 		let mut ticket = Ticket {
 			id: 0,
 			owner_id: uuid::Uuid::new_v4(),
@@ -572,6 +575,7 @@ mod ticket_tests {
 
 	#[tokio::test]
 	async fn check_branch_process_initiate_works(){
+		dotenv::dotenv().ok();
 		let mut ticket = Ticket {
 			id: 0,
 			owner_id: uuid::Uuid::new_v4(),
@@ -609,6 +613,7 @@ mod ticket_tests {
 	}
 	#[tokio::test]
 	async fn check_branch_process_1_approve_works(){
+		dotenv::dotenv().ok();
 		let mut ticket = Ticket {
 			id: 0,
 			owner_id: uuid::Uuid::new_v4(),
