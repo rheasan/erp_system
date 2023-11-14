@@ -1,5 +1,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
-
+type process_data = {
+	process_id: string,
+	description: string,
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if(req.method !== 'GET'){
@@ -17,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 	})
 	.then((json) => {
-		return json as Array<string>;
+		return json as Array<process_data>;
 	})
 	.catch((e) => {
 		console.log(`[ERROR]: Error in /api/get_all_processes, error: ${e}`);

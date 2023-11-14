@@ -4,9 +4,8 @@ use axum::{
 	extract
 };
 use serde::{Serialize, Deserialize};
-use sqlx::PgPool;
+use sqlx::{PgPool, FromRow};
 use std::path::PathBuf;
-use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Process {
@@ -14,6 +13,12 @@ pub struct Process {
     pub pid: String,
     pub jobs: Vec<Job>,
     pub desc: Option<String>
+}
+
+#[derive(Serialize, Deserialize, FromRow)]
+pub struct ProcessGetResponse {
+	pub process_id: String,
+	pub description: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -46,20 +51,23 @@ fn save_process_data(data: &Process) -> Result<(), std::io::Error> {
     return Ok(());
 }
 
-pub async fn get_all_processes() -> Result<Json<Vec<String>>, StatusCode> {
+// TODO: only return processes that the user has access to
+pub async fn get_all_processes(
+	extract::State(pool) : extract::State<PgPool>
+) -> Result<Json<Vec<ProcessGetResponse>>, StatusCode> {
 
-	let config_path = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
-	let mut names = Vec::new();
-	for entry in WalkDir::new(config_path) {
-		let entry = entry.unwrap();
-		if entry.metadata().unwrap().is_dir() {
-			continue;
-		}
-		// TODO: find better way!!!!!
-		let filename = entry.file_name().to_str().unwrap().to_string().replace(".json", "");
-		names.push(filename);
+	let query = sqlx::query_as("select process_id, description from process_defs")
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = query {
+		eprintln!("Error fetching process names: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
-	return Ok(Json(names));
+
+	let processes = query.unwrap();
+
+	return Ok(Json(processes));
 }
 
 pub async fn create_process(
