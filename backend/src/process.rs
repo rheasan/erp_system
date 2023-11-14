@@ -19,7 +19,9 @@ pub struct Process {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Job {
     pub event: String,
-    pub args : Option<Vec<String>>
+    pub args : Option<Vec<String>>,
+	pub next: Vec<i32>,
+	pub required: Vec<i32>
 }
 
 pub fn read_process_data(pid: String) -> Result<Process, std::io::Error> {

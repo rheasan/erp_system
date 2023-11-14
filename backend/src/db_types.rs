@@ -27,19 +27,17 @@ pub struct Role {
 pub struct Ticket {
 	pub id: i32,
 	pub owner_id: uuid::Uuid,
-	pub current_user_id: uuid::Uuid,
 	pub process_id: String,
-	pub current_step: i32,
 	pub log_id: uuid::Uuid,
 	pub is_public: bool,
 	pub created_at: chrono::DateTime<chrono::Utc>,
 	pub updated_at: chrono::DateTime<chrono::Utc>,
 	pub status: String,
+	pub complete: i32,
 }
 
 impl Ticket {
-	pub fn update(&mut self) {
-		self.current_step = self.current_step + 1;
+	pub fn update_time(&mut self) {
 		self.updated_at = chrono::Utc::now();
 	}
 }

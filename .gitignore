@@ -3,4 +3,3 @@ dist
 test_data
 target
 .env
-backend/data
