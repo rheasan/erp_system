@@ -1,5 +1,5 @@
 use axum::{routing::{get, post}, Router, http::{Method, HeaderValue}};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf};
 use sqlx::postgres::PgPoolOptions;
 use tower_http::cors::CorsLayer;
 use axum::http::header::CONTENT_TYPE;
@@ -16,6 +16,14 @@ pub mod utils;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	dotenv::dotenv().ok();
+
+	// check if the data dir exists or not
+	let data_dir = std::env::var("PROCESS_DATA_PATH").expect("PROCESS_DATA_PATH not defined");
+	let data_dir = PathBuf::from(data_dir);
+	if !data_dir.try_exists().unwrap() {
+		println!("Process data dir not found. Creating...");
+		std::fs::create_dir_all(data_dir).unwrap();
+	}
 
 	let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
 	let port = port.parse::<u16>().unwrap();
