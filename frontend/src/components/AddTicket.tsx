@@ -47,6 +47,9 @@ const AddTicket = () => {
 			if(response.status === 201){
 				toast.success("Ticket created successfully. Check dashboard");
 			}
+			else {
+				return Promise.reject(response);
+			}
 		})
 		.then(() => {
 			setSelectedProcess({process_id: "", description: ""});

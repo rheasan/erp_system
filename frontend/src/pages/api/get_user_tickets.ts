@@ -1,13 +1,22 @@
 import { NextApiRequest, NextApiResponse } from "next";
-type Ticket  = {
+type TicketData  = {
+	current_tickets: CurrentTicket[],
+	own_tickets: OwnTicket[]
+}
+type CurrentTicket = {
+	type_: string,
+	ticketid: number,
+	active: boolean,
+	node_number: number,
+	process_id: string
+}
+type OwnTicket = {
 	id: number,
-	owner_id: string,
 	process_id: string,
 	is_public: boolean,
 	created_at: string,
 	updated_at: string,
 	status: string,
-	is_current_user: boolean
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -15,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return res.status(400).end();
 	}
 
-	const body = req.body as {username? : string, userid? : string};
+	const body = req.body as {username: string};
 
 	const get_userid_endpoint = new URL(process.env.BACKEND_URL + "/get_userid?username=" + body.username);
 	const userid: string | null = await fetch(get_userid_endpoint)
@@ -24,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			return Promise.reject(response.status);
 		}
 		else{
-			return response.json()
+			return response.json();
 		}
 	})
 	.then((json) => {
@@ -38,21 +47,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	if(userid === null){
 		return res.status(500).end();
 	}
-	else {
-		delete body.username;
-		body.userid = userid;
-	}
 
-	console.log(body);
 
-	const endpoint = new URL(process.env.BACKEND_URL + "/get_user_tickets");
-	const response = await fetch(endpoint, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(body)
-	})
+	const endpoint = new URL(process.env.BACKEND_URL + "/get_user_tickets?userid=" + userid);
+	const tickets = await fetch(endpoint)
 	.then((response) => {
 		if(response.status === 200){
 			return response.json();
@@ -62,15 +60,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 	})
 	.then((json) => {
-		return json.tickets as Array<Ticket>;
+		return json as TicketData;
 	})
 	.catch((e) => {
 		console.log(`[ERROR]: Error in /api/get_user_tickets, body: ${body}, error: ${e}`);
 		return null;
 	});
-	if(response === null){
+	if(tickets === null){
 		res.status(500).end();
 	}
 
-	return res.status(200).json({tickets: response});
+	return res.status(200).json({tickets});
 };

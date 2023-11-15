@@ -1,0 +1,10 @@
+{
+  "pname": "test simple approve process on frontend",
+  "pid": "approve_frontend",
+  "jobs": [
+    { "event": "initiate", "args": null, "next": [1], "required": [] },
+    { "event": "approve", "args": ["director_iitp"], "next": [2], "required": [0] },
+    { "event": "complete", "args": null, "next": [], "required": [1] }
+  ],
+  "desc": "process for testing simple approve process. initiate->approve(director)->complete"
+}

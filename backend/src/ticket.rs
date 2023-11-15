@@ -46,19 +46,26 @@ pub struct UserIdQueryRes {
 	userid: uuid::Uuid
 }
 #[derive(Serialize, Deserialize)]
-pub struct UserTicket {
+pub struct UserTickets {
+	current_tickets: Vec<CurrentTicket>,
+	own_tickets: Vec<OwnTicket>
+}
+#[derive(Serialize, Deserialize, FromRow)]
+pub struct CurrentTicket {
+	type_: String,
+	ticketid: i32,
+	active: bool,
+	node_number: i32,
+	process_id: String
+}
+#[derive(Serialize, Deserialize, FromRow)]
+pub struct OwnTicket {
 	pub id: i32,
-	pub owner_id: uuid::Uuid,
 	pub process_id: String,
 	pub is_public: bool,
 	pub created_at: chrono::DateTime<chrono::Utc>,
 	pub updated_at: chrono::DateTime<chrono::Utc>,
 	pub status: String,
-	pub is_current_user: bool
-}
-#[derive(Serialize, Deserialize)]
-pub struct GetUserTicketsRes {
-	pub tickets: Vec<UserTicket>
 }
 #[derive(Serialize, Deserialize)]
 pub struct GetUserTicketsReq {
@@ -481,8 +488,46 @@ fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process
 			result.completable_steps.push(step);
 		}
 	}
-
 	return Ok(result);
+}
+
+pub async fn get_user_tickets(
+	query: extract::Query<GetUserTicketsReq>,
+	extract::State(pool): extract::State<sqlx::PgPool>
+) -> Result<(StatusCode, Json<UserTickets>), StatusCode> {
+	let userid = uuid::Uuid::parse_str(&query.0.userid).unwrap();
+	let mut result = UserTickets {
+		current_tickets: Vec::new(),
+		own_tickets: Vec::new()
+	};
+
+	// select all tickets from user_active_tickets of type_!="own"
+	let current_ticket_query: Result<Vec<CurrentTicket>, _> = 
+		sqlx::query_as("select type_, node_number, ticketid, active, userid, process_id from user_active_tickets left join tickets on tickets.id=user_active_tickets.ticketid where userid=$1 and type_!='own' and status!='closed';")
+		.bind(&userid)
+		.fetch_all(&pool)
+		.await;
+	if let Err(e) = current_ticket_query {
+		eprintln!("Error reading current tickets: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+	result.current_tickets = current_ticket_query.unwrap();
+
+	// select all tickets from tickets where owner_id=userid
+	let own_ticket_query: Result<Vec<OwnTicket>, _> = 
+		sqlx::query_as("select id, process_id, is_public, created_at, updated_at, status from tickets where owner_id=$1;")
+		.bind(&userid)
+		.fetch_all(&pool)
+		.await;
+
+	if let Err(e) = own_ticket_query {
+		eprintln!("Error reading own tickets: {}", e);
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	result.own_tickets = own_ticket_query.unwrap();
+
+	return Ok((StatusCode::OK, Json(result)));
 }
 
 #[cfg(test)]

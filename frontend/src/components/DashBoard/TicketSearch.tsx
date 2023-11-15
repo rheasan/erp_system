@@ -2,170 +2,222 @@ import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
-type Ticket  = {
+
+type TicketData  = {
+	current_tickets: CurrentTicket[],
+	own_tickets: OwnTicket[]
+}
+type CurrentTicket = {
+	// TODO: type_ = approve (for now)
+	type_: string,
+	ticketid: number,
+	active: boolean,
+	node_number: number,
+	process_id: string
+}
+type OwnTicket = {
 	id: number,
-	owner_id: string,
 	process_id: string,
 	is_public: boolean,
 	created_at: string,
 	updated_at: string,
 	status: string,
-	is_current_user: boolean
-}
-type TicketCardProps = {
-	data: Ticket,
-	username: string,
-	tickets?: Ticket[],
-	setTickets: React.Dispatch<React.SetStateAction<Ticket[] | null>>
-}
-type TicketState = {
-	completed: Ticket[],
-	open: Ticket[],
-	rejected: Ticket[]
 }
 
-const TicketCard = (props: TicketCardProps) => {
-	const {data, setTickets, tickets} = props;
 
-	const updateTicket = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>, isApproved: boolean) => {
-		const button = e.target as HTMLButtonElement;
-		if(data.is_current_user) {
-			button.disabled = true;
+const CurrentTicketContainer = (props: {current_tickets: CurrentTicket[]}) => {
+	const {user} = useUser();
+	const [currentTickets, setCurrentTickets] = useState(props.current_tickets);
+	const format_type = (type: string) => {
+		switch(type) {
+			case "approve" : {
+				return "Approval needed"
+			}
+			default: {
+				return type;
+			}
 		}
+	}
+	const handle_ticket_event = (ticket: CurrentTicket, status: boolean) => {
 		fetch("/api/update_ticket", {
-			method: 'POST',
+			method: "POST",
 			headers: {
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
-				ticket_id: data.id,
-				status: isApproved
+				ticket_id: ticket.ticketid,
+				status: status,
+				username: user?.username,
+				node: ticket.node_number
 			})
 		})
-		.then((res) => {
-			if(res.status === 200){
-				toast.success("Ticket updated successfully");
-				console.log(data.is_current_user);
-				if(!data.is_current_user){
-					let newTicketState = structuredClone(tickets!);
-					newTicketState = newTicketState.filter((ticket) => ticket.id !== data.id);
-					setTickets(newTicketState);
-				}
-			}
-			else{
-				toast.error("Error while updating ticket");
-			}
+		.then(() => {
+			setCurrentTickets((prev) => {
+				let new_tickets = prev.filter((t) => t.ticketid != ticket.ticketid);
+				return new_tickets;
+			});
+			toast.success("Ticket updated");
 		})
-		.catch(e => {
-			toast.error(e);
-		})
-
 	}
-	return (
-		<div className="border-2 border-white rounded p-4 w-fit">
-			<p>Process ID: {data.process_id}</p>
-			<p>Ticket created by: {data.owner_id}</p>
-			<p>Created at: {new Date(data.created_at).toUTCString()}</p>
-			<p>Updated at: {new Date(data.updated_at).toUTCString()}</p>
-			<p>Status: {data.status}</p>
-			{
-				data.is_current_user && data.status === "open" && 
-				<div className="w-auto flex flex-row gap-2 justify-around">
-					<button onClick={(e) => updateTicket(e, true)} className="border-white p-2 w-fit border rounded bg-green-900">Approve</button>
-					<button onClick={(e) => updateTicket(e, false)} className="border-white p-2 w-fit border rounded bg-red-900">Reject</button>
-				</div>
-			}
-		</div>	
-	)
-}
+	const Current_ticket = (props: {ticket: CurrentTicket}) => {
+		let {ticket} = props;
 
-const TicketContainer = (props: {data: Ticket[] | null, type: keyof TicketState, username: string}) => {
-	const {data, type, username} = props;
-	const [tickets, setTickets] = useState<Ticket[] | null>(data);
-	const formattedType = type[0].toUpperCase() + type.slice(1);
+		return (
+			<div className="flex flex-col p-2 border border-black w-fit">
+				<p>Process: {ticket.process_id}</p>
+				<p>{format_type(ticket.type_)}</p>
+				{
+					ticket.type_ == "approve" && (
+						<div className="flex flex-row gap-2 p-2 text-black">
+							{/* FIXME: this logic should be extracted into its own function to prevent new unique function binding for each button*/}
+							<button className="bg-green-400 p-2 rounded" onClick={() => handle_ticket_event(ticket, true)}>Approve</button>
+							<button className="bg-red-400 p-2 rounded" onClick={() => handle_ticket_event(ticket, false)}>Reject</button>
+						</div>
+					)
+				}
+			</div>
+		)
+	}
+
 	return (
-		<div>
-			<h1 className="text-2xl">{formattedType} Tickets</h1>
+		<div className="p-4 flex flex-col gap-4">
+			<h1 className="text-2xl">Current Tickets</h1>
 			{
-				tickets?.length === 0 && <p>No {formattedType} tickets</p>
+				currentTickets.length === 0 && (
+					<p>No current tickets</p>
+				)
 			}
 			{
-				tickets?.map((ticket) => {
-					return <TicketCard data={ticket} username={username} tickets={tickets} setTickets={setTickets} key={ticket.id} />
+				currentTickets.length > 0 && currentTickets?.map((ticket) => {
+					return <Current_ticket ticket={ticket} key={ticket.process_id+ticket.node_number} />
 				})
 			}
 		</div>
 	)
 }
 
-const TicketSearch = () => {
-	const [tickets, setTickets] = useState<TicketState | null>(null);
-	const {user} = useUser();
-
-	const splitTickets = (tickets: Ticket[]) => {
-		let res : TicketState = {
-			completed: [],
+const OwnTicketContainer = (props: {own_tickets: OwnTicket[] | undefined}) => {
+	const groupTickets = (tickets: OwnTicket[] | undefined) => {
+		let groupedTickets: {open: OwnTicket[], closed: OwnTicket[], rejected: OwnTicket[]} = {
 			open: [],
+			closed: [],
 			rejected: []
 		};
-		for(let i = 0; i < tickets.length; i++){
-			if(tickets[i].status === "completed"){
-				res.completed.push(tickets[i]);
+		if(tickets === undefined) {
+			return groupedTickets;
+		}
+		for(let ticket of tickets){
+			if(ticket.status == "open") {
+				groupedTickets.open.push(ticket);
 			}
-			else if(tickets[i].status === "open"){
-				res.open.push(tickets[i]);
+			else if(ticket.status == "closed") {
+				groupedTickets.closed.push(ticket);
 			}
-			else{
-				res.rejected.push(tickets[i]);
+			else {
+				groupedTickets.rejected.push(ticket);
 			}
 		}
-		return res;
+		return groupedTickets;
 	}
+	const [ownTickets, _] = useState(groupTickets(props.own_tickets));
+	const Own_ticket = (props: {ticket: OwnTicket}) => {
+		let {ticket} = props;
 
-	const fetchAllTickets = () => {
-		fetch("/api/get_user_tickets", {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				username: user?.username
-			})
-		})
-		.then((res) => {
-			if(res.status !== 200) {
-				return Promise.reject("Failed to fetch tickets");
-			}
-			else{
-				return res.json();
-			}
-		})
-		.then((data) => {
-			setTickets(splitTickets(data.tickets));
-		})
-		.catch(e => {
-			toast.error(e);
-		})	
+		return (
+			<div className="flex flex-col p-2 border border-black w-fit my-2">
+				<p>Process: {ticket.process_id}</p>
+				<p>Ticket id: {ticket.id}</p>
+				<p>Created At: {new Date(ticket.created_at).toUTCString()}</p>
+				<p>Last updated At: {new Date(ticket.updated_at).toUTCString()}</p>
+				<p>Status: {ticket.status}</p>
+			</div>
+		)
 	}
 
 	return (
-		<div className="border-b-2 border-white flex flex-col gap-4">
-			<div className="text-2xl">
-				<p>Available tickets: <button onClick={fetchAllTickets} className="h-2 w-2">&#x27F3;</button></p>
-			</div>
+		<div>
+			<h1 className="text-2xl">Your Tickets</h1>
 			{
-				tickets === null && <p>No tickets found</p>
+				ownTickets?.open.length === 0 && ownTickets?.closed.length === 0 && ownTickets?.rejected.length === 0 && (
+					<p>No tickets</p>
+				)
 			}
 			{
-				tickets !== null &&
-				<div className="flex flex-col gap-4">
-					<TicketContainer data={tickets.open} type={"open"} username={user?.username!} />	
-					<TicketContainer data={tickets.completed} type={"completed"} username={user?.username!} />	
-					<TicketContainer data={tickets.rejected} type={"rejected"} username={user?.username!} />	
-				</div>
+				(ownTickets?.open.length > 0 || ownTickets?.closed.length > 0 || ownTickets?.rejected.length > 0) &&
+				<ul className="list-disc mx-4">
+					<li>
+						<h1 className="text-xl">Open Tickets</h1>
+						{
+							ownTickets?.open.map((ticket) => {
+								return <Own_ticket ticket={ticket} key={ticket.id} />
+							})
+						}
+					</li>
+					<li>
+						<h1 className="text-xl">Closed Tickets</h1>
+						{
+							ownTickets?.closed.map((ticket) => {
+								return <Own_ticket ticket={ticket} key={ticket.id} />
+							})
+						}
+					</li>
+					<li>
+						<h1 className="text-xl">Rejected Tickets</h1>
+						{
+							ownTickets?.rejected.map((ticket) => {
+								return <Own_ticket ticket={ticket} key={ticket.id} />
+							})
+						}
+					</li>
+				</ul>
 			}	
 		</div>
 	)
+}
+
+
+const TicketSearch = () => {
+	const [tickets, setTickets] = useState<TicketData | null>(null);
+	const {user, isLoaded} = useUser();
+	useEffect(() => {
+		if(isLoaded) {
+			let req_body = {
+				username: user?.username
+			};
+			fetch("/api/get_user_tickets", {
+				method: "POST",
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(req_body)
+			})
+			.then((res) => {
+				if(res.status != 200) {
+					return Promise.reject("Error fetching tickets");
+				}
+				else{
+					return res.json();
+				}
+			})
+			.then((data) => {
+				setTickets(data.tickets);
+			})
+			.catch((e) => {
+				toast.error(e);
+			})
+		}
+	}, [isLoaded]);
+
+	if(tickets === null){
+		return <p>Loading tickets...</p>
+	}
+	return (
+		<div>
+			<CurrentTicketContainer current_tickets={tickets?.current_tickets!}/>
+			<div className="border-b-2 border-white"></div>
+			<OwnTicketContainer own_tickets={tickets?.own_tickets!}/>
+		</div>
+	);
 }
 
 export default TicketSearch;
