@@ -162,8 +162,9 @@ pub async fn create_ticket(
 		match new_ticket.type_ {
 			NewUserTicketType::ApproveRequest => {
 				// this query should always return 1 row as process always contains valid usernames
+				let new_ticket_username = new_ticket.username.unwrap();
 				let userid_query: Result<Userid, _> = sqlx::query_as("select userid from users where username=$1")
-				.bind(&new_ticket.username)
+				.bind(&new_ticket_username)
 				.fetch_one(&mut *tx)
 				.await;
 
@@ -303,8 +304,9 @@ pub async fn update_ticket(
 		for new_ticket in result.unwrap() {
 			match new_ticket.type_ {
 				NewUserTicketType::ApproveRequest => {
+					let new_ticket_username = new_ticket.username.unwrap();
 					let userid_query: Result<Userid, _> = sqlx::query_as("select userid from users where username=$1")
-						.bind(&new_ticket.username)
+						.bind(&new_ticket_username)
 						.fetch_one(&mut *tx)
 						.await;
 
@@ -444,7 +446,12 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32) -> Result<Single
 
 	for step in next_steps {
 		let next_job = process_data.jobs[step as usize].clone();
-		if utils::check_required_complete(ticket.complete, &next_job.required) {
+		if next_job.event == "complete" {
+			if utils::check_n_complete(ticket.complete, process_data.jobs.len() as i32) {
+				result.completable_steps.push(step);
+			}
+		}
+		else if utils::check_required_complete(ticket.complete, &next_job.required) {
 			result.completable_steps.push(step);
 		}
 	}
@@ -483,8 +490,6 @@ fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process
 			});
 		}
 		Event::Complete => {
-
-			ticket.complete |= 1 << current_node;
 			ticket.update_time();
 			result.new_ticket = Some(NewUserTicket {
 				type_: NewUserTicketType::Completion,
@@ -492,12 +497,19 @@ fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process
 				node: current_node,
 				username: None
 			});
+
+			return Ok(result);
 		}
 	}
 	let next_steps = current_job.next;
 	for step in next_steps {
 		let next_job = process.jobs[step as usize].clone();
-		if utils::check_required_complete(ticket.complete, &next_job.required) {
+		if next_job.event == "complete" {
+			if utils::check_n_complete(ticket.complete, process.jobs.len() as i32) {
+				result.completable_steps.push(step);
+			}
+		}
+		else if utils::check_required_complete(ticket.complete, &next_job.required) {
 			result.completable_steps.push(step);
 		}
 	}
