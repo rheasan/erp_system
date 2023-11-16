@@ -73,7 +73,7 @@ pub struct GetUserTicketsReq {
 	pub userid: String 
 }
 
-#[derive(Serialize, FromRow)]
+#[derive(Serialize, FromRow, Deserialize)]
 struct Userid {
 	userid: uuid::Uuid
 }	
@@ -303,8 +303,20 @@ pub async fn update_ticket(
 		for new_ticket in result.unwrap() {
 			match new_ticket.type_ {
 				NewUserTicketType::ApproveRequest => {
-					let query = sqlx::query("insert into user_active_tickets (userid, ticketid, active, node_number, type_) values ($1, $2, $3, $4, $5)")
+					let userid_query: Result<Userid, _> = sqlx::query_as("select userid from users where username=$1")
 						.bind(&new_ticket.username)
+						.fetch_one(&mut *tx)
+						.await;
+
+					if let Err(e) = userid_query {
+						eprintln!("Error reading userid from db: {}", e);
+						return Err(StatusCode::INTERNAL_SERVER_ERROR);
+					}
+					let userid = userid_query.unwrap();
+
+
+					let query = sqlx::query("insert into user_active_tickets (userid, ticketid, active, node_number, type_) values ($1, $2, $3, $4, $5)")
+						.bind(userid.userid)
 						.bind(&new_ticket.ticket_id)
 						.bind(true)
 						.bind(new_ticket.node)
