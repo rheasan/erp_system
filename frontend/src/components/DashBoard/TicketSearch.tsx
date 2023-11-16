@@ -13,7 +13,8 @@ type CurrentTicket = {
 	ticketid: number,
 	active: boolean,
 	node_number: number,
-	process_id: string
+	process_id: string,
+	owner_name: string
 }
 type OwnTicket = {
 	id: number,
@@ -63,8 +64,9 @@ const CurrentTicketContainer = (props: {current_tickets: CurrentTicket[]}) => {
 		let {ticket} = props;
 
 		return (
-			<div className="flex flex-col p-2 border border-black w-fit">
+			<div className="flex flex-col p-2 border border-white w-fit bg-gray-900 rounded px-8">
 				<p>Process: {ticket.process_id}</p>
+				<p>Ticket created by {ticket.owner_name}</p>
 				<p>{format_type(ticket.type_)}</p>
 				{
 					ticket.type_ == "approve" && (

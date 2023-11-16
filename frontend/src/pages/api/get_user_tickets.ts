@@ -8,7 +8,8 @@ type CurrentTicket = {
 	ticketid: number,
 	active: boolean,
 	node_number: number,
-	process_id: string
+	process_id: string,
+	owner_name: string,
 }
 type OwnTicket = {
 	id: number,

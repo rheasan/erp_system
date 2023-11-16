@@ -56,7 +56,8 @@ pub struct CurrentTicket {
 	ticketid: i32,
 	active: bool,
 	node_number: i32,
-	process_id: String
+	process_id: String,
+	owner_name: String
 }
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct OwnTicket {
@@ -503,7 +504,10 @@ pub async fn get_user_tickets(
 
 	// select all tickets from user_active_tickets of type_!="own"
 	let current_ticket_query: Result<Vec<CurrentTicket>, _> = 
-		sqlx::query_as("select type_, node_number, ticketid, active, userid, process_id from user_active_tickets left join tickets on tickets.id=user_active_tickets.ticketid where userid=$1 and type_!='own' and status!='closed';")
+		sqlx::query_as(r#"select type_, node_number, ticketid, active, user_active_tickets.userid, process_id, username as owner_name 
+			from user_active_tickets join tickets on user_active_tickets.ticketid=tickets.id 
+			join users on tickets.owner_id=users.userid
+			where user_active_tickets.type_!='own' and user_active_tickets.active='true' and user_active_tickets.userid=$1;"#)
 		.bind(&userid)
 		.fetch_all(&pool)
 		.await;
