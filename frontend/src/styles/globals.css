@@ -41,15 +41,12 @@ form {
 	border-bottom: 2px black;
 }
 
-input[type="text"] {
+input{
 	background-color: white;
 	color: black;
 	height: 2em;
 	padding-inline: 0.5em;
-}
-
-input {
-	margin: 5px;
+	margin: 5px
 }
 button[type="submit"] {
 	padding: 2px;

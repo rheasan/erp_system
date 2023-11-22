@@ -11,8 +11,9 @@ use std::path::PathBuf;
 pub struct Process {
     pub pname: String,
     pub pid: String,
-    pub jobs: Vec<Job>,
-    pub desc: Option<String>
+    pub steps: Vec<Job>,
+    pub desc: Option<String>,
+	pub roles: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, FromRow)]
@@ -95,9 +96,10 @@ pub async fn create_process(
 
     
 
-	let query = sqlx::query("insert into process_defs (process_id, allowed_roles) values ($1, $2)")
+	let query = sqlx::query("insert into process_defs (process_id, allowed_roles, description) values ($1, $2, $3)")
 		.bind(&payload.pid)
-		.bind(vec![String::from("any")])
+		.bind(&payload.roles)
+		.bind(&payload.desc)
 		.execute(&mut *tx)
 		.await;
 

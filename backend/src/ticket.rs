@@ -410,7 +410,7 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32) -> Result<Single
 	}
 
 	let process_data = process_data.unwrap();
-	let current_job = process_data.jobs[current_node as usize].clone();
+	let current_job = process_data.steps[current_node as usize].clone();
 	let event = process_map.get(&current_job.event).unwrap();
 
 	let mut result = SingleExecState {
@@ -445,9 +445,9 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32) -> Result<Single
 	}
 
 	for step in next_steps {
-		let next_job = process_data.jobs[step as usize].clone();
+		let next_job = process_data.steps[step as usize].clone();
 		if next_job.event == "complete" {
-			if utils::check_n_complete(ticket.complete, process_data.jobs.len() as i32) {
+			if utils::check_n_complete(ticket.complete, process_data.steps.len() as i32) {
 				result.completable_steps.push(step);
 			}
 		}
@@ -466,7 +466,7 @@ fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process
 		completable_steps: Vec::new(),
 		new_ticket: None
 	};
-	let current_job = process.jobs[current_node as usize].clone();
+	let current_job = process.steps[current_node as usize].clone();
 
 	match process_map.get(&current_job.event).unwrap() {
 		Event::Initiate => {
@@ -503,9 +503,9 @@ fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process
 	}
 	let next_steps = current_job.next;
 	for step in next_steps {
-		let next_job = process.jobs[step as usize].clone();
+		let next_job = process.steps[step as usize].clone();
 		if next_job.event == "complete" {
-			if utils::check_n_complete(ticket.complete, process.jobs.len() as i32) {
+			if utils::check_n_complete(ticket.complete, process.steps.len() as i32) {
 				result.completable_steps.push(step);
 			}
 		}
