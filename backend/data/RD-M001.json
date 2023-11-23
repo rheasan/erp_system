@@ -1,8 +1,8 @@
 {
   "pname": "process for recruiting staff under research project",
   "pid": "RD-M001",
-  "jobs": [
-    { "event": "initiate", "args": null, "next": [1], "required": [] },
+  "steps": [
+    { "event": "initiate", "args": [], "next": [1], "required": [] },
     {
       "event": "approve",
       "args": ["a_registrar_r_d"],
@@ -19,5 +19,6 @@
     { "event": "notify", "args": ["director"], "next": [5], "required": [3] },
     { "event": "complete", "args": null, "next": [], "required": [4] }
   ],
-  "desc": "process for recruiting staff under research project"
+  "desc": "process for recruiting staff under research project",
+  "roles" : ["any"]
 }

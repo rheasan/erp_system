@@ -1,12 +1,13 @@
 {
   "pname": "process for testing simple branch",
   "pid": "simple_branch_test",
-  "jobs": [
-    { "event": "initiate", "args": null, "next": [1, 2], "required": [] },
+  "steps": [
+    { "event": "initiate", "args": [], "next": [1, 2], "required": [] },
     { "event": "approve", "args": ["erp_admin"], "next": [3], "required": [0] },
     { "event": "approve", "args": ["erp_admin"], "next": [3], "required": [0] },
     { "event": "approve", "args": ["erp_admin"], "next": [4], "required": [1, 2] },
     { "event": "complete", "args": null, "next": [], "required": [4] }
   ],
-  "desc": "process for testing simple branching process. initiate->2approve->1approve->complete"
+  "desc": "process for testing simple branching process. initiate->2approve->1approve->complete",
+  "roles" : ["any"]
 }

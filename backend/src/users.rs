@@ -1,7 +1,7 @@
 use axum::{http::StatusCode, Json, extract};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, QueryBuilder, Postgres};
-
+use crate::logger::{LogType, admin_logger};
 #[derive(Deserialize)]
 pub struct CreateUser {
 	username: String,
@@ -76,7 +76,8 @@ pub async fn create_user(
 		.await;
 
 	if let Err(e) = new_user_query {
-		eprintln!("Failed to get existing user data at create_user, username: {}, e: {}", username, e);
+		admin_logger(&LogType::Error, &format!("Failed to get existing user data at create_user, username: {}, e: {}", username, e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -94,7 +95,8 @@ pub async fn create_user(
 		.await;
 
 	if let Err(e) = insert_into_user {
-		eprintln!("Error inserting into user: {}", e);
+		admin_logger(&LogType::Error, &format!("Error inserting into user: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	
@@ -107,14 +109,16 @@ pub async fn create_user(
 		.await;
 
 	if let Err(e) = role_query {
-		eprintln!("Error in register_new_user in role_checking: {}", e);
+		admin_logger(&LogType::Error, &format!("Error in register_new_user in role_checking: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	let role_query = role_query.unwrap();
 	
 	if role_query[0].count != roles.len() as i64 {
-		eprintln!("Error in create_new_user. Request contains non-existing roles: username: {}", username);
+		admin_logger(&LogType::Error, &format!("Error in create_new_user. Request contains non-existing roles: username: {}", username), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::CONFLICT);
 	}
 
@@ -129,7 +133,8 @@ pub async fn create_user(
 		.build();
 
 	if let Err(e) = insert_roles_query.execute(&mut *tx).await {
-		eprintln!("Error inserting roles in create_user: {}", e);
+		admin_logger(&LogType::Error, &format!("Error inserting roles in create_user: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::CONFLICT);
 	}
 
@@ -140,12 +145,14 @@ pub async fn create_user(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error removing user from new_users. username: {}, e: {}", username, e);
+		admin_logger(&LogType::Error, &format!("Error removing user from new_users. username: {}, e: {}", username, e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	let result = tx.commit().await;
 	if let Err(e) = result {
-		eprintln!("failed to commit transaction in create_user, username: {}, e: {}", username, e);
+		admin_logger(&LogType::Error, &format!("failed to commit transaction in create_user, username: {}, e: {}", username, e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	return Ok(StatusCode::CREATED);
@@ -167,14 +174,16 @@ pub async fn register_new_user(
 		.await;
 
 	if let Err(e) = check_user_query {
-		eprintln!("Error in register_new_user, username: {}, : {}", username, e);
+		admin_logger(&LogType::Error, &format!("Error in register_new_user, username: {}, : {}", username, e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	let check_user_query = check_user_query.unwrap();
 
 	if check_user_query[0].count != 0 {
-		eprintln!("Error in register_new_user, username: {}", username);
+		admin_logger(&LogType::Error, &format!("Error in register_new_user, username: {}", username), None)
+			.map_err(|_| StatusCode::CONFLICT)?;
 		return Err(StatusCode::CONFLICT);
 	}
 
@@ -187,7 +196,8 @@ pub async fn register_new_user(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error registering new user: {}", e);
+		admin_logger(&LogType::Error, &format!("Error registering new user: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -207,7 +217,8 @@ pub async fn check_user_approved(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error checking new user status: {}", e);
+		admin_logger(&LogType::Error, &format!("Error checking new user status: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	let query = query.unwrap();
@@ -230,7 +241,8 @@ pub async fn is_admin(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error in is_admin: {}", e);
+		admin_logger(&LogType::Error, &format!("Error in is_admin: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	
@@ -253,7 +265,8 @@ pub async fn get_all_new_users(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error fetching new users at get_all_new_users. e: {}", e);
+		admin_logger(&LogType::Error, &format!("Error fetching new users at get_all_new_users. e: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -273,7 +286,8 @@ pub async fn get_userid(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error fetching userid at get_userid. e: {}", e);
+		admin_logger(&LogType::Error, &format!("Error fetching userid at get_userid. e: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 

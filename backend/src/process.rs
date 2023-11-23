@@ -6,6 +6,7 @@ use axum::{
 use serde::{Serialize, Deserialize};
 use sqlx::{PgPool, FromRow};
 use std::path::PathBuf;
+use crate::ticket_logger::{LogType, admin_logger};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Process {
@@ -62,7 +63,8 @@ pub async fn get_all_processes(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error fetching process names: {}", e);
+		admin_logger(&LogType::Error, &format!("Error fetching process names: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -81,11 +83,13 @@ pub async fn create_process(
 	let config_path = config_dir.join(format!("{}.json", pid));
 	match config_path.try_exists() {
 		Err(e) => {
-			eprintln!("Error reading saved process data: {}", e);
+			admin_logger(&LogType::Error, &format!("Error reading saved process data: {}", e), None)
+				.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 		Ok(true) => {
-			eprintln!("Process with pid {} already exists", pid);
+			admin_logger(&LogType::Error, &format!("Process with pid {} already exists", pid), None)
+				.map_err(|_| StatusCode::FORBIDDEN)?;
 			return Err(StatusCode::FORBIDDEN);
 		}
 		Ok(false) => {
@@ -104,20 +108,26 @@ pub async fn create_process(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error inserting new process: {} for pid {}", e, payload.pid);
+		admin_logger(&LogType::Error, &format!("Error inserting new process: {} for pid {}", e, payload.pid), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	if let Err(e) = save_process_data(&payload) {
-        eprintln!("Error saving new process data: {}", e);
+        admin_logger(&LogType::Error, &format!("Error saving new process data: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
 	let result = tx.commit().await;
 	if let Err(e) = result {
-		eprintln!("Error commiting transaction: {} for pid {}", e, payload.pid);
+		admin_logger(&LogType::Error, &format!("Error commiting transaction: {} for pid {}", e, payload.pid), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		std::fs::remove_file(config_path).unwrap();
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
+
+	admin_logger(&LogType::Info, &format!("Process {} created successfully", payload.pid), None)
+		.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     return Ok(StatusCode::CREATED);
 }

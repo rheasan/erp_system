@@ -1,9 +1,10 @@
 {
   "pname": "process for testing Event::Initiate",
   "pid": "initiate_test",
-  "jobs": [
-    { "event": "initiate", "args": null, "next": [1], "required": [] },
+  "steps": [
+    { "event": "initiate", "args": [], "next": [1], "required": [] },
     { "event": "complete", "args": null, "next": [], "required": [0] }
   ],
-  "desc": "process for testing Event::Initiate"
+  "desc": "process for testing Event::Initiate",
+  "roles" : ["any"]
 }

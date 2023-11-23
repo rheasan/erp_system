@@ -11,6 +11,7 @@ pub mod roles;
 pub mod db_types;
 pub mod ticket;
 pub mod utils;
+pub mod logger;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,11 +20,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	// check if the data dir exists or not
 	let data_dir = std::env::var("PROCESS_DATA_PATH").expect("PROCESS_DATA_PATH not defined");
-	let data_dir = PathBuf::from(data_dir);
-	if !data_dir.try_exists().unwrap() {
+	let process_data_dir = PathBuf::from(&data_dir);
+	if !process_data_dir.try_exists().unwrap() {
 		println!("Process data dir not found. Creating...");
-		std::fs::create_dir_all(data_dir).unwrap();
+		std::fs::create_dir_all(process_data_dir).unwrap();
 	}
+
+	let log_dir = PathBuf::from(&data_dir).join("public_logs");
+	if !log_dir.try_exists().unwrap() {
+		println!("Public log dir not found. Creating...");
+		std::fs::create_dir_all(log_dir).unwrap();
+	}
+
+	let admin_log_dir = PathBuf::from(&data_dir).join("admin_logs");
+	if !admin_log_dir.try_exists().unwrap() {
+		println!("Admin log dir not found. Creating...");
+		std::fs::create_dir_all(&admin_log_dir).unwrap();
+	}
+
+
 
 	let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
 	let port = port.parse::<u16>().unwrap();

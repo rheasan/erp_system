@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use axum::{http::StatusCode, extract, Json};
 use sqlx::{PgPool, postgres::PgRow};
+use crate::logger::{LogType, admin_logger};
 
 
 #[derive(Deserialize)]
@@ -27,7 +28,8 @@ pub async fn create_role(
 		.await;
 
 	if let Err(e) = insert_into_role {
-		eprint!("Error insert into role_defs: {}", e);
+		admin_logger(&LogType::Error, &format!("Error insert into role_defs: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -42,7 +44,8 @@ pub async fn get_all_roles(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error in get_current_roles");
+		admin_logger(&LogType::Error, &format!("Error in get_current_roles"), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	let query = query.unwrap()

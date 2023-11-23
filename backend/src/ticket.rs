@@ -2,8 +2,8 @@ use axum::{Json, http::StatusCode, extract};
 use serde::{Serialize, Deserialize};
 use sqlx::{FromRow, Postgres, Transaction};
 use crate::{db_types::Ticket, process::{read_process_data, Process}};
-use std::{collections::{HashMap, VecDeque}, f32::consts::E};
-use crate::utils;
+use std::{collections::{HashMap, VecDeque}, f32::consts::E, fmt::format};
+use crate::{utils, logger::{LogType, log, admin_logger}};
 
 #[derive(Eq, PartialEq)]
 pub enum Event {Initiate, Approve, Notify, Complete}
@@ -26,7 +26,7 @@ pub struct SingleExecState {
 	pub completable_steps : Vec<i32>,
 }
 #[derive(Debug)]
-pub enum ExecuteErr {InvalidTicket, FailedToExecute, InvalidEvent, FailedToReadProcessData}
+pub enum ExecuteErr {InvalidTicket, FailedToExecute, InvalidEvent, FailedToReadProcessData, FailedToLog}
 #[derive(Serialize, Deserialize)]
 pub struct CreateTicket {
 	pub process_id: String,
@@ -119,8 +119,9 @@ pub async fn create_ticket(
 		.execute(&mut *tx)
 		.await;
 
+
 	if let Err(e) = query {
-		eprintln!("Error adding ticket: process {} from {}: {}", payload.process_id, payload.owner_id, e);
+		log(LogType::Error, format!("Error adding ticket: process {} from {}: {}", payload.process_id, payload.owner_id, e), log_id)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -131,10 +132,12 @@ pub async fn create_ticket(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error reading ticket id from db: {}", e);
+		log(LogType::Error, format!("Error reading ticket id from db: {}", e), log_id)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	let mut ticket = query.unwrap();
+
+	log(LogType::Info, format!("Ticket {} created by {}", ticket.id, ticket.owner_id), log_id)?;
 
 	let query = sqlx::query("insert into user_active_tickets (userid, ticketid, active, node_number, type_) values ($1, $2, $3, $4, $5)")
 		.bind(&payload.owner_id)
@@ -146,7 +149,7 @@ pub async fn create_ticket(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error adding ticket: process {} from {}: {}", payload.process_id, payload.owner_id, e);
+		log(LogType::Error, format!("Error adding ticket: process {} from {}: {}", payload.process_id, payload.owner_id, e), log_id)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -155,7 +158,7 @@ pub async fn create_ticket(
 
 	let result = update_internal(&mut ticket, request).await;
 	if let Err(e) = result {
-		eprintln!("Error updating ticket: id = {} :  {:?}",ticket.id, e);
+		log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket.id, e), log_id)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	for new_ticket in result.unwrap() {
@@ -169,7 +172,7 @@ pub async fn create_ticket(
 				.await;
 
 				if let Err(e) = userid_query {
-					eprintln!("Error reading userid from db: {}", e);
+					log(LogType::Error, format!("Error reading userid from db: {}", e), log_id)?;
 					return Err(StatusCode::INTERNAL_SERVER_ERROR);
 				}
 				let userid = userid_query.unwrap();
@@ -183,9 +186,10 @@ pub async fn create_ticket(
 					.execute(&mut *tx)
 					.await;
 				if let Err(e) = query {
-					eprintln!("Error updating ticket: id = {} :  {:?}",ticket.id, e);
+					log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket.id, e), log_id)?;
 					return Err(StatusCode::INTERNAL_SERVER_ERROR);
 				}
+				log(LogType::Request, format!("Ticket {} approval requested from {}", ticket.id, userid.userid), ticket.log_id)?;
 			}
 			NewUserTicketType::Notify => {
 				todo!("implement notify logic")
@@ -197,10 +201,11 @@ pub async fn create_ticket(
 					.execute(&mut *tx)
 					.await;
 				if let Err(e) = query {
-					eprintln!("Error updating ticket: id = {} :  {:?}",ticket.id, e);
+					log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket.id, e), log_id)?;
 					return Err(StatusCode::INTERNAL_SERVER_ERROR);
 				}
 				ticket.status = "closed".to_string();
+				log(LogType::Completion, format!("Ticket {} completed", ticket.id), ticket.log_id)?;
 			}	
 		}
 	}
@@ -215,15 +220,15 @@ pub async fn create_ticket(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error updating ticket: id = {} :  {:?}",ticket.id, e);
+		log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket.id, e), log_id)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 
-
+	log(LogType::Info, format!("Ticket {} created successfully", ticket.id), log_id)?;
 	// commit the transaction
 	if let Err(e) = tx.commit().await {
-		eprintln!("Error commiting transaction: {} for pid {}", e, ticket.process_id);
+		log(LogType::Error, format!("Error commiting transaction: {} for pid {}", e, ticket.process_id), log_id)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -248,6 +253,18 @@ pub async fn update_ticket(
 	let mut tx = pool.begin().await.unwrap();
 	let ticket_id = payload.ticket_id;
 
+	let query: Result<Ticket, _> = sqlx::query_as("select * from tickets where id=$1")
+		.bind(&ticket_id)
+		.fetch_one(&pool)
+		.await;
+
+	if let Err(e) = query {
+		admin_logger(&LogType::Error, &format!("Error reading ticket from db: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+		return Err(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+	let mut ticket = query.unwrap();
+
 	// remove the ticket from user_active_tickets
 	let query = sqlx::query("update user_active_tickets set active=false where ticketid=$1 and userid=$2")
 		.bind(&ticket_id)
@@ -256,7 +273,7 @@ pub async fn update_ticket(
 		.await;
 
 	if let Err(e) = query {
-		eprintln!("Error updating ticket: id = {} :  {:?}",ticket_id, e);
+		log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket_id, e), ticket.log_id)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
@@ -267,7 +284,7 @@ pub async fn update_ticket(
 			.execute(&mut *tx)
 			.await;
 		if let Err(e) = query {
-			eprintln!("Error updating ticket: id = {} :  {:?}",ticket_id, e);
+			log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket_id, e), ticket.log_id)?;
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 
@@ -276,28 +293,18 @@ pub async fn update_ticket(
 			.execute(&mut *tx)
 			.await;
 		if let Err(e) = query {
-			eprintln!("Error updating ticket: id = {} :  {:?}",ticket_id, e);
+			log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket_id, e), ticket.log_id)?;
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
+		log(LogType::Rejection, format!("Ticket {} rejected by {}", ticket.id, payload.user_id), ticket.log_id)?;
 	}
 	else {
 		// user accepted the ticket
 
-		let query: Result<Ticket, _> = sqlx::query_as("select * from tickets where id=$1")
-			.bind(&ticket_id)
-			.fetch_one(&pool)
-			.await;
-
-		if let Err(e) = query {
-			eprintln!("Error reading ticket from db: {}", e);
-			return Err(StatusCode::INTERNAL_SERVER_ERROR);
-		}
-		let mut ticket = query.unwrap();
-
 		// process the update
 		let result = update_internal(&mut ticket, &payload).await;
 		if let Err(e) = result {
-			eprintln!("Error updating ticket: id = {} :  {:?}",ticket.id, e);
+			log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket.id, e), ticket.log_id)?;
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 
@@ -311,7 +318,7 @@ pub async fn update_ticket(
 						.await;
 
 					if let Err(e) = userid_query {
-						eprintln!("Error reading userid from db: {}", e);
+						log(LogType::Error, format!("Error reading userid from db: {}", e), ticket.log_id)?;
 						return Err(StatusCode::INTERNAL_SERVER_ERROR);
 					}
 					let userid = userid_query.unwrap();
@@ -326,9 +333,10 @@ pub async fn update_ticket(
 						.execute(&mut *tx)
 						.await;
 					if let Err(e) = query {
-						eprintln!("Error updating ticket: id = {} :  {:?}",ticket.id, e);
+						log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket.id, e), ticket.log_id)?;
 						return Err(StatusCode::INTERNAL_SERVER_ERROR);
 					}
+					log(LogType::Request, format!("Ticket {} approval requested from {}", ticket.id, userid.userid), ticket.log_id)?;
 				}
 				NewUserTicketType::Notify => {
 					todo!("implement notify logic")
@@ -340,10 +348,11 @@ pub async fn update_ticket(
 						.execute(&mut *tx)
 						.await;
 					if let Err(e) = query {
-						eprintln!("Error updating ticket: id = {} :  {:?}",ticket.id, e);
+						log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket.id, e), ticket.log_id)?;
 						return Err(StatusCode::INTERNAL_SERVER_ERROR);
 					}
 					ticket.status = "closed".to_string();
+					log(LogType::Completion, format!("Ticket {} completed", ticket.id), ticket.log_id)?;
 				}	
 			}
 		}
@@ -358,14 +367,14 @@ pub async fn update_ticket(
 			.await;
 
 		if let Err(e) = query {
-			eprintln!("Error updating ticket: id = {} :  {:?}",ticket.id, e);
+			log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket.id, e), ticket.log_id)?;
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 	}
 
 
 	if let Err(e) = tx.commit().await {
-		eprintln!("Error commiting transaction: {} for pid {}", e, ticket_id);
+		log(LogType::Error, format!("Error commiting transaction: {} for pid {}", e, ticket_id), ticket.log_id)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 
 	}
@@ -377,7 +386,8 @@ async fn update_internal(ticket: &mut Ticket, request: &UpdateTicket) -> Result<
 	let mut ticket_queue = Vec::new();
 	let process_data = read_process_data(ticket.process_id.clone());
 	if let Err(e) = process_data {
-		eprintln!("Error reading process data: {}", e);
+		log(LogType::Error, format!("Error reading process data: {}", e), ticket.log_id)
+			.map_err(|_| ExecuteErr::FailedToLog)?;
 		return Err(ExecuteErr::FailedToReadProcessData);
 	}
 	let process_data = process_data.unwrap();
@@ -405,7 +415,8 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32) -> Result<Single
 	let process_map = get_event_map();
 	let process_data = read_process_data(ticket.process_id.clone());
 	if let Err(e) = process_data {
-		eprintln!("Error reading process data: {}", e);
+		log(LogType::Error, format!("Error reading process data: {}", e), ticket.log_id)
+			.map_err(|_| ExecuteErr::FailedToLog)?;
 		return Err(ExecuteErr::FailedToReadProcessData);
 	}
 
@@ -428,6 +439,8 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32) -> Result<Single
 			if next_steps.len() == 0 {
 				result.status = TicketStatus::Closed;
 			}
+			log(LogType::Info, format!("Ticket {} initiated succssfully", ticket.id), ticket.log_id)
+				.map_err(|_| ExecuteErr::FailedToLog)?;
 		}
 		Event::Notify => {
 			ticket.complete |= 1 << current_node;
@@ -437,9 +450,13 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32) -> Result<Single
 		Event::Approve => {
 			ticket.complete |= 1 << current_node;
 			ticket.update_time();
+			log(LogType::Approval, format!("Ticket {} approved by {}", ticket.id, current_job.args.unwrap()[0]), ticket.log_id)
+				.map_err(|_| ExecuteErr::FailedToLog)?;
 		}
 		Event::Complete => {
 			// no user should be able to complete this event
+			log(LogType::Error, format!("Attempt to complete ticket {} from {}", ticket.id, current_job.args.unwrap()[0]), ticket.log_id)
+				.map_err(|_| ExecuteErr::FailedToLog)?;
 			return Err(ExecuteErr::InvalidTicket);
 		}
 	}
@@ -536,7 +553,8 @@ pub async fn get_user_tickets(
 		.fetch_all(&pool)
 		.await;
 	if let Err(e) = current_ticket_query {
-		eprintln!("Error reading current tickets: {}", e);
+		admin_logger(&LogType::Error, &format!("Error reading current tickets: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	result.current_tickets = current_ticket_query.unwrap();
@@ -549,7 +567,8 @@ pub async fn get_user_tickets(
 		.await;
 
 	if let Err(e) = own_ticket_query {
-		eprintln!("Error reading own tickets: {}", e);
+		admin_logger(&LogType::Error, &format!("Error reading own tickets: {}", e), None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
