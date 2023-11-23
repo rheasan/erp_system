@@ -59,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
 		.route("/", get(say_hello))
 		.route("/get_all_processes", get(process::get_all_processes))
+		.route("/get_process_data", get(process::get_process_data))
 		.route("/process", post(process::create_process))
 		.route("/users", post(users::create_user))
 		.route("/get_userid", get(users::get_userid))

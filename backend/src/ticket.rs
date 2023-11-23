@@ -31,7 +31,10 @@ pub enum ExecuteErr {InvalidTicket, FailedToExecute, InvalidEvent, FailedToReadP
 pub struct CreateTicket {
 	pub process_id: String,
 	pub owner_id: uuid::Uuid,
-	pub is_public: bool
+	pub owner_name: String,
+	pub is_public: bool,
+	pub filename: Option<String>,
+	pub file_url: Option<String>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -105,6 +108,12 @@ pub async fn create_ticket(
 
 	let mut tx = pool.begin().await.unwrap();
 	let log_id = uuid::Uuid::new_v4();
+
+	if payload.filename.is_some() {
+		let file_name = payload.filename.unwrap();
+		let file_url = payload.file_url.unwrap();
+		log(LogType::Info, format!("File {} added by {}. URL: {}", file_name, payload.owner_name, file_url), log_id)?;
+	}
 
 	let query = sqlx::query("insert into tickets (owner_id, process_id, log_id, is_public, created_at, updated_at, status, complete) values ($1, $2, $3, $4, $5, $6, $7, $8)")
 		.bind(&payload.owner_id)

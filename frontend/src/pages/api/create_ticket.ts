@@ -6,9 +6,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return res.status(400).end();
 	}
 
-	const body = req.body as {is_public: boolean, username?: string, process_id: string, owner_id? : string};
+	const body = req.body as {is_public: boolean, owner_name?: string, process_id: string, owner_id? : string, filename?: string, file_url?: string};
 
-	const get_userid_endpoint = new URL(process.env.BACKEND_URL + "/get_userid?username=" + body.username);
+	const get_userid_endpoint = new URL(process.env.BACKEND_URL + "/get_userid?username=" + body.owner_name);
 	const userid: string | null = await fetch(get_userid_endpoint)
 	.then((response) => {
 		if(response.status !== 200){
@@ -30,7 +30,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return res.status(500).end();
 	}
 	else {
-		delete body.username;
 		body.owner_id = userid;
 	}
 

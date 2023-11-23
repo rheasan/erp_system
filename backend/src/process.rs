@@ -6,7 +6,7 @@ use axum::{
 use serde::{Serialize, Deserialize};
 use sqlx::{PgPool, FromRow};
 use std::path::PathBuf;
-use crate::ticket_logger::{LogType, admin_logger};
+use crate::logger::{LogType, admin_logger};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Process {
@@ -21,6 +21,17 @@ pub struct Process {
 pub struct ProcessGetResponse {
 	pub process_id: String,
 	pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ProcessDataQuery {
+	pub process_id: String
+}
+
+#[derive(Serialize)]
+pub struct ProcessDataResponse {
+	pub active: bool,
+	pub description: Option<String> 
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -130,4 +141,43 @@ pub async fn create_process(
 	admin_logger(&LogType::Info, &format!("Process {} created successfully", payload.pid), None)
 		.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     return Ok(StatusCode::CREATED);
+}
+
+pub async fn get_process_data(
+	extract::Query(query) : extract::Query<ProcessDataQuery>
+) -> Result<Json<ProcessDataResponse>, StatusCode> {
+	let pid = query.process_id.clone();
+
+	let mut result = ProcessDataResponse {
+		active: false,
+		description: None
+	};
+
+	let config_dir = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
+	let config_path = config_dir.join(format!("{}.json", pid));
+	match config_path.try_exists() {
+		Err(e) => {
+			admin_logger(&LogType::Error, &format!("Error reading saved process data: {}", e), None)
+				.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+			return Err(StatusCode::INTERNAL_SERVER_ERROR);
+		}
+		Ok(false) => {
+			admin_logger(&LogType::Error, &format!("Process with pid {} does not exist", pid), None)
+				.map_err(|_| StatusCode::NOT_FOUND)?;
+			return Err(StatusCode::NOT_FOUND);
+		}
+		Ok(true) => {
+			{};
+		}
+	}
+
+	let process_data = read_process_data(pid).unwrap();
+	let initiate_args = process_data.steps.get(0).unwrap().args.as_ref().unwrap();
+	// checkbox was checked on frontend
+	result.active = initiate_args.len() > 1 && initiate_args[0] == "on";
+	if result.active {
+		result.description = Some(initiate_args[1].clone());
+	}
+
+	return Ok(Json(result));
 }
