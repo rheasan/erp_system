@@ -30,6 +30,7 @@ const AddTicket = () => {
 	}
 	const fetchProcessData = (e: React.FormEvent<HTMLSelectElement>) => {
 		e.preventDefault();
+		submit_ref.current?.setAttribute("disabled", "false");
 		let select_elem = e.target as HTMLSelectElement;
 		let process_id = select_elem.value;
 		setSelectedProcess(processList.find((e) => e.process_id === process_id) as process_data);
@@ -84,9 +85,10 @@ const AddTicket = () => {
 		e.preventDefault();
 		const form = e.target as HTMLFormElement;
 		const formData = Array.from(new FormData(form));
+		// FIXME: weird is_public check
 		const data = {
 			process_id: selectedProcess.process_id,
-			is_public: formData[0][1] === "on",
+			is_public: (formData[0] && formData[0][0] === "is_public" && formData[0][1] === "on") ?? false,
 			owner_name: user?.username,
 			filename: initFileData?.name,
 			file_url: initFileData?.url,
@@ -136,10 +138,9 @@ const AddTicket = () => {
 				<div className="border-b-2 border-white"></div>
 				{ selectedProcess.process_id !== "" &&
 					<form onSubmit={createTicket} className="flex flex-col items-start">
-						{/* FIXME: probably wont work because server cant return React.JSX.Element */}
 						<div className="flex flex-row gap-4 items-center">
 							<label htmlFor="is_public">Is public?</label>
-							<input type="radio" id="is_public" name="is_public"/>
+							<input type="checkbox" id="is_public" name="is_public"/>
 						</div>
 						{selectedProcess && processData.length > 0 && processData?.map((e,i) => {
 							return e;
