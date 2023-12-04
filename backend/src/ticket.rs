@@ -275,6 +275,14 @@ pub async fn update_ticket(
 	}
 	let mut ticket = query.unwrap();
 
+	if ticket.status == "closed" {
+		admin_logger(&LogType::Error, 
+			&format!("Attempt to update closed ticket. id: {}, user_id: {}", ticket.id, payload.user_id),
+			None)
+			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+		return Err(StatusCode::FORBIDDEN);
+	}
+
 	// remove the ticket from user_active_tickets
 	let query = sqlx::query("update user_active_tickets set active=false where ticketid=$1 and userid=$2")
 		.bind(&ticket_id)
