@@ -42,7 +42,8 @@ pub struct UpdateTicket {
 	pub ticket_id: i32,
 	pub user_id: uuid::Uuid,
 	pub	status: bool,
-	pub node: i32
+	pub node: i32,
+	pub message: Option<String>
 }
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct UserIdQueryRes {
@@ -163,7 +164,7 @@ pub async fn create_ticket(
 	}
 
 	// execute the 1 st node of the ticket (always Event::Initiate)
-	let request = &UpdateTicket { ticket_id: ticket.id, user_id: payload.owner_id, status: true, node: 0 };
+	let request = &UpdateTicket { ticket_id: ticket.id, user_id: payload.owner_id, status: true, node: 0, message: None };
 
 	let result = update_internal(&mut ticket, request).await;
 	if let Err(e) = result {
@@ -305,7 +306,9 @@ pub async fn update_ticket(
 			log(LogType::Error, format!("Error updating ticket: id = {} :  {:?}",ticket_id, e), ticket.log_id)?;
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
-		log(LogType::Rejection, format!("Ticket {} rejected by {}", ticket.id, payload.user_id), ticket.log_id)?;
+		log(LogType::Rejection, 
+			format!("Ticket {} rejected by {}, message: {}", ticket.id, payload.user_id, payload.message.unwrap_or("none".into())),
+			ticket.log_id)?;
 	}
 	else {
 		// user accepted the ticket
@@ -402,7 +405,7 @@ async fn update_internal(ticket: &mut Ticket, request: &UpdateTicket) -> Result<
 	let process_data = process_data.unwrap();
 	// process the first request
 	// TODO: currently exec_user_request will not return any new ticket that has to be added. this may change later
-	let result = execute_user_request(ticket, request.node)?;
+	let result = execute_user_request(ticket, request.node, request.message.as_ref())?;
 	node_queue.extend(result.completable_steps.iter());
 
 	// FIXME: cleanup this code
@@ -419,7 +422,7 @@ async fn update_internal(ticket: &mut Ticket, request: &UpdateTicket) -> Result<
 	return Ok(ticket_queue);
 }
 
-fn execute_user_request(ticket: &mut Ticket, current_node: i32) -> Result<SingleExecState, ExecuteErr>{
+fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<&String>) -> Result<SingleExecState, ExecuteErr>{
 	// FIXME: this should be a static
 	let process_map = get_event_map();
 	let process_data = read_process_data(ticket.process_id.clone());
@@ -459,7 +462,9 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32) -> Result<Single
 		Event::Approve => {
 			ticket.complete |= 1 << current_node;
 			ticket.update_time();
-			log(LogType::Approval, format!("Ticket {} approved by {}", ticket.id, current_job.args.unwrap()[0]), ticket.log_id)
+			log(LogType::Approval, 
+				format!("Ticket {} approved by {}, message: {}", ticket.id, current_job.args.unwrap()[0], message.unwrap_or(&"none".to_string())),
+				ticket.log_id)
 				.map_err(|_| ExecuteErr::FailedToLog)?;
 		}
 		Event::Complete => {
@@ -611,7 +616,8 @@ mod ticket_tests {
 			ticket_id: 0,
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
-			node: 0
+			node: 0,
+			message: None
 		};
 
 		let result = update_internal(&mut ticket, &request).await;
@@ -638,7 +644,8 @@ mod ticket_tests {
 			ticket_id: 0,
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
-			node: 1
+			node: 1,
+			message: None
 		};
 		// in this case the user request is completing approve event so the entire process should complete
 		let result = update_internal(&mut ticket, &request).await;
@@ -673,7 +680,8 @@ mod ticket_tests {
 			ticket_id: 0,
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
-			node: 0
+			node: 0,
+			message: None
 		};
 		// in this case the user request is completing approve event so the entire process should complete
 		let result = update_internal(&mut ticket, &request).await;
@@ -709,7 +717,8 @@ mod ticket_tests {
 			ticket_id: 0,
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
-			node: 0
+			node: 0,
+			message: None
 		};
 
 		let result = update_internal(&mut ticket, &request).await;
@@ -747,7 +756,8 @@ mod ticket_tests {
 			ticket_id: 0,
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
-			node: 2
+			node: 2,
+			message: None
 		};
 
 		let result = update_internal(&mut ticket, &request).await;
