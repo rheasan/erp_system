@@ -1,13 +1,15 @@
 import { NextApiRequest, NextApiResponse } from "next";
-
+type process_data = {
+	process_id: string,
+	description: string,
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if(req.method !== 'GET'){
 		return res.status(400).end();
 	}
-	const query = req.query.username;
 	
-	const endpoint = new URL(process.env.BACKEND_URL + "/new_user_approved?username=" + query);
+	const endpoint = new URL(process.env.BACKEND_URL + "/process/all");
 	const msg = await fetch(endpoint)
 	.then((response) => {
 		if(response.status != 200){
@@ -18,10 +20,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 	})
 	.then((json) => {
-		return json.status as boolean;
+		return json as Array<process_data>;
 	})
 	.catch((e) => {
-		console.log(`[ERROR]: Error in /api/check_user, query: ${query}, error: ${e}`);
+		console.log(`[ERROR]: Error in /api/get_all_processes, error: ${e}`);
 		return null;
 	});
 
@@ -30,4 +32,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
 	return res.status(200).json({msg});
-};
+}

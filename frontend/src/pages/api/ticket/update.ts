@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	const body = req.body as {ticket_id: number, status: boolean, node: number, username?: string, user_id?: string};
 
-	const get_userid_endpoint = new URL(process.env.BACKEND_URL + "/get_userid?username=" + body.username);
+	const get_userid_endpoint = new URL(process.env.BACKEND_URL + "/userid?username=" + body.username);
 	const userid: string | null = await fetch(get_userid_endpoint)
 	.then((response) => {
 		if(response.status !== 200){
@@ -53,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 	})
 	.catch((e) => {
-		console.log(`[ERROR]: Error in /api/update_ticket, body: ${body}, error: ${e}`);
+		console.log(`[ERROR]: Error in /api/ticket/update, body: ${body}, error: ${e}`);
 		return null;
 	});
 	if(response === null){
@@ -61,4 +61,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
 	return res.status(200).json({});
-};
+}

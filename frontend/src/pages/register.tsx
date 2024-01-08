@@ -16,7 +16,7 @@ const Register = () => {
 	// fetch all roles
 	useEffect(() => {
 		if(roles.length === 1 && roles[0] === ""){
-			fetch("/api/get_all_roles")
+			fetch("/api/roles")
 			.then((res) => {
 				if(res.status === 500) {
 					toast.error("Registration failed. Contact admins");
@@ -60,7 +60,7 @@ const Register = () => {
 			roles,
 			email
 		});
-		fetch("/api/register_new_user", {
+		fetch("/api/new_user", {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'

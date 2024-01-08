@@ -22,7 +22,7 @@ const AddTicket = () => {
 	const {user} = useUser();
 
 	const fetchAllProcesses = () => {
-		fetch('/api/get_all_processes')
+		fetch('/api/process/all')
 			.then((response) => response.json())
 			.then((resJson) => {
 				setProcessList(resJson.msg);
@@ -35,13 +35,7 @@ const AddTicket = () => {
 		let process_id = select_elem.value;
 		setSelectedProcess(processList.find((e) => e.process_id === process_id) as process_data);
 		// TODO: fetch process data
-		fetch("/api/get_process_data", {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({process_id: process_id})
-		})
+		fetch("/api/process?process_id=" + process_id)
 		.then((res) => {
 			if(res.status === 200){
 				return res.json();
@@ -93,7 +87,7 @@ const AddTicket = () => {
 			filename: initFileData?.name,
 			file_url: initFileData?.url,
 		}
-		fetch('/api/create_ticket', {
+		fetch('/api/ticket', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'

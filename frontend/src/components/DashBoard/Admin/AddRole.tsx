@@ -11,7 +11,7 @@ const AddRole = () => {
 			role_ : data[0][1]
 		});
 
-		fetch("/api/add_role", {
+		fetch("/api/roles", {
 			method: 'POST',
 			headers: {
 				'Content-Type' : 'application/json'

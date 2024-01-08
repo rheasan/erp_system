@@ -15,7 +15,7 @@ const UserCard = (props: UserCardProps) => {
 	const {username, email, roles} = props.new_user;
 	const {state, change_state} = props;
 	const handleNewUserApproved = () => {
-		fetch("/api/approve_user", {
+		fetch("/api/new_user/approve_user", {
 			headers: {
 				'Content-Type': 'application/json'
 			},
@@ -52,7 +52,7 @@ const UserCard = (props: UserCardProps) => {
 const ApproveNewUsers = () => {
 	const [newUsers, setNewUsers] = useState<Array<NewUser> | null>(null);
 	useEffect(() => {
-		fetch("/api/get_new_users")
+		fetch("/api/new_user")
 		.then((res) => {
 			if(res.status === 200){
 				return res.json();

@@ -30,7 +30,7 @@ export default function Home() {
 
 	useEffect(() => {
 		if(isLoaded && isSignedIn) {
-			fetch("/api/check_user?username=" + user.username)
+			fetch("/api/new_user/approved?username=" + user.username)
 			.then((res) => {
 				if(res.status === 500){
 					router.push("/");

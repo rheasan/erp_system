@@ -189,7 +189,7 @@ const AddProcess = () => {
 			process: process,
 			username: user?.username!
 		}
-		fetch("/api/create_process", {
+		fetch("/api/process", {
 			method: "POST",
 			headers: {
 				'Content-Type': 'application/json'

@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 	const body = req.body as {username: string};
 
-	const get_userid_endpoint = new URL(process.env.BACKEND_URL + "/get_userid?username=" + body.username);
+	const get_userid_endpoint = new URL(process.env.BACKEND_URL + "/userid?username=" + body.username);
 	const userid: string | null = await fetch(get_userid_endpoint)
 	.then((response) => {
 		if(response.status !== 200){
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return json.userid as string;
 	})
 	.catch((e) => {
-		console.error(`[ERROR]: Error in /api/get_user_tickets get_userid, body: ${body}, error: ${e}`);
+		console.error(`[ERROR]: Error in /api/ticket/user get_userid, body: ${body}, error: ${e}`);
 		return null;
 	});
 
@@ -50,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
 
-	const endpoint = new URL(process.env.BACKEND_URL + "/get_user_tickets?userid=" + userid);
+	const endpoint = new URL(process.env.BACKEND_URL + "/ticket/user?userid=" + userid);
 	const tickets = await fetch(endpoint)
 	.then((response) => {
 		if(response.status === 200){
@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return json as TicketData;
 	})
 	.catch((e) => {
-		console.log(`[ERROR]: Error in /api/get_user_tickets, body: ${body}, error: ${e}`);
+		console.log(`[ERROR]: Error in /api/ticket/user/POST, body: ${body}, error: ${e}`);
 		return null;
 	});
 	if(tickets === null){

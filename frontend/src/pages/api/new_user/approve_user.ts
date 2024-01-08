@@ -6,8 +6,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		return res.status(400).end();
 	}
 
-	const body = req.body as {username: string, email: string, roles: string};
-	const endpoint = new URL(process.env.BACKEND_URL + "/new_user");
+	const body = req.body as {username: string};
+	const endpoint = new URL(process.env.BACKEND_URL + "/users");
 	const response = await fetch(endpoint, {
 		method: 'POST',
 		headers: {
@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		body: JSON.stringify(body)
 	})
 	.then((response) => {
-		if(response.status === 200 || response.status === 409){
+		if(response.status === 201 || response.status === 409){
 			return response.status;	
 		}
 		else{
@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 	})
 	.catch((e) => {
-		console.log(`[ERROR]: Error in /api/register_new_user, body: ${body}, error: ${e}`);
+		console.log(`[ERROR]: Error in /api/new_user/approve_user, body: ${body}, error: ${e}`);
 		return 500;
 	});
 

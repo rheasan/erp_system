@@ -40,7 +40,7 @@ const CurrentTicketContainer = (props: {current_tickets: CurrentTicket[]}) => {
 		}
 	}
 	const handle_ticket_event = (ticket: CurrentTicket, status: boolean) => {
-		fetch("/api/update_ticket", {
+		fetch("/api/ticket/update", {
 			method: "POST",
 			headers: {
 				'Content-Type': 'application/json'
@@ -186,7 +186,7 @@ const TicketSearch = () => {
 			let req_body = {
 				username: user?.username
 			};
-			fetch("/api/get_user_tickets", {
+			fetch("/api/ticket/user", {
 				method: "POST",
 				headers: {
 					'Content-Type': 'application/json'
