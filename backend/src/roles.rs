@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use axum::{http::StatusCode, extract, Json};
-use sqlx::{PgPool, postgres::PgRow};
+use sqlx::PgPool;
 use crate::logger::{LogType, admin_logger};
 
 
@@ -9,7 +9,7 @@ pub struct CreateRole {
 	role_: String
 }
 
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow)]
 pub struct RoleDef {
 	id: i32,
 	role_: String, 
@@ -44,7 +44,7 @@ pub async fn get_all_roles(
 		.await;
 
 	if let Err(e) = query {
-		admin_logger(&LogType::Error, &format!("Error in get_current_roles"), None)
+		admin_logger(&LogType::Error, &format!("Error in get_current_roles : {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}

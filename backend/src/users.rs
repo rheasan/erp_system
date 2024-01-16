@@ -88,7 +88,7 @@ pub async fn create_user(
 
 	let insert_into_user = 
 		sqlx::query("insert into users (userid, username, email) values ($1, $2, $3)")
-		.bind(&userid)
+		.bind(userid)
 		.bind(&new_user.username)
 		.bind(&new_user.email)
 		.execute(&mut *tx)
@@ -102,7 +102,7 @@ pub async fn create_user(
 	
 	// insert roles
 	// verify correct roles
-	let roles = new_user.roles.split(",").map(|r| r.trim()).collect::<Vec<_>>();
+	let roles = new_user.roles.split(',').map(|r| r.trim()).collect::<Vec<_>>();
 	let role_query : Result<Vec<CountQuery>, _> = sqlx::query_as("select count(*) from role_defs where role_ in (select * from unnest($1::varchar[]))")
 		.bind(&roles)
 		.fetch_all(&mut *tx)
@@ -127,7 +127,7 @@ pub async fn create_user(
 	let insert_roles_query = 
 		role_query_builder.
 		push_values(roles.iter(), |mut b, role| {
-			b.push_bind(&userid)
+			b.push_bind(userid)
 			.push_bind(role);
 		})
 		.build();

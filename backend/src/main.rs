@@ -1,9 +1,13 @@
+// i dont like implicit returns. sometimes explicitly saying return is nicer when rereading code
+#![allow(clippy::needless_return)]
+
+
 use axum::{routing::{get, post}, Router, http::{Method, HeaderValue}};
 use std::{net::SocketAddr, path::PathBuf};
 use sqlx::postgres::PgPoolOptions;
 use tower_http::cors::CorsLayer;
 use axum::http::header::CONTENT_TYPE;
-use dotenv;
+use dotenv::dotenv;
 
 pub mod process;
 pub mod users;
@@ -13,10 +17,11 @@ pub mod ticket;
 pub mod utils;
 pub mod logger;
 
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
-	dotenv::dotenv().ok();
+	dotenv().ok();
 
 	// check if the data dir exists or not
 	let data_dir = std::env::var("PROCESS_DATA_PATH").expect("PROCESS_DATA_PATH not defined");

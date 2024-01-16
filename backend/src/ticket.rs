@@ -1,8 +1,8 @@
 use axum::{Json, http::StatusCode, extract};
 use serde::{Serialize, Deserialize};
-use sqlx::{FromRow, Postgres, Transaction};
+use sqlx::FromRow;
 use crate::{db_types::Ticket, process::{read_process_data, Process}};
-use std::{collections::{HashMap, VecDeque}, f32::consts::E, fmt::format};
+use std::collections::{HashMap, VecDeque};
 use crate::{utils, logger::{LogType, log, admin_logger}};
 
 #[derive(Eq, PartialEq)]
@@ -117,12 +117,12 @@ pub async fn create_ticket(
 	}
 
 	let query = sqlx::query("insert into tickets (owner_id, process_id, log_id, is_public, created_at, updated_at, status, complete) values ($1, $2, $3, $4, $5, $6, $7, $8)")
-		.bind(&payload.owner_id)
+		.bind(payload.owner_id)
 		.bind(&payload.process_id)
-		.bind(&log_id)
-		.bind(&payload.is_public)
-		.bind(&chrono::Utc::now())
-		.bind(&chrono::Utc::now())
+		.bind(log_id)
+		.bind(payload.is_public)
+		.bind(chrono::Utc::now())
+		.bind(chrono::Utc::now())
 		.bind("open")
 		// no nodes have been completed at this stage
 		.bind(0i32)
@@ -137,7 +137,7 @@ pub async fn create_ticket(
 
 	// FIXME: should not use log_id for determining the ticket id
 	let query: Result<Ticket, _> = sqlx::query_as("select * from tickets where log_id=$1")
-		.bind(&log_id)
+		.bind(log_id)
 		.fetch_one(&mut *tx)
 		.await;
 
@@ -150,8 +150,8 @@ pub async fn create_ticket(
 	log(LogType::Info, format!("Ticket {} created by {}", ticket.id, ticket.owner_id), log_id)?;
 
 	let query = sqlx::query("insert into user_active_tickets (userid, ticketid, active, node_number, type_) values ($1, $2, $3, $4, $5)")
-		.bind(&payload.owner_id)
-		.bind(&ticket.id)
+		.bind(payload.owner_id)
+		.bind(ticket.id)
 		.bind(true)
 		.bind(0i32)
 		.bind("own")
@@ -189,7 +189,7 @@ pub async fn create_ticket(
 
 				let query = sqlx::query("insert into user_active_tickets (userid, ticketid, active, node_number, type_) values ($1, $2, $3, $4, $5)")
 					.bind(userid.userid)
-					.bind(&new_ticket.ticket_id)
+					.bind(new_ticket.ticket_id)
 					.bind(true)
 					.bind(new_ticket.node)
 					.bind("approve")
@@ -207,7 +207,7 @@ pub async fn create_ticket(
 			NewUserTicketType::Completion => {
 				// this ticket is always the last in the new_ticket_queue because it requires all other nodes to be executed first
 				let query = sqlx::query("update user_active_tickets set active=false where ticketid=$1")
-					.bind(&ticket.id)
+					.bind(ticket.id)
 					.execute(&mut *tx)
 					.await;
 				if let Err(e) = query {
@@ -223,9 +223,9 @@ pub async fn create_ticket(
 	// update all fields of the ticket
 	let query = sqlx::query("update tickets set status=$1, complete=$2, updated_at=$3 where id=$4")
 		.bind(&ticket.status)
-		.bind(&ticket.complete)
-		.bind(&ticket.updated_at)
-		.bind(&ticket.id)
+		.bind(ticket.complete)
+		.bind(ticket.updated_at)
+		.bind(ticket.id)
 		.execute(&mut *tx)
 		.await;
 
@@ -264,7 +264,7 @@ pub async fn update_ticket(
 	let ticket_id = payload.ticket_id;
 
 	let query: Result<Ticket, _> = sqlx::query_as("select * from tickets where id=$1")
-		.bind(&ticket_id)
+		.bind(ticket_id)
 		.fetch_one(&pool)
 		.await;
 
@@ -285,8 +285,8 @@ pub async fn update_ticket(
 
 	// remove the ticket from user_active_tickets
 	let query = sqlx::query("update user_active_tickets set active=false where ticketid=$1 and userid=$2")
-		.bind(&ticket_id)
-		.bind(&payload.user_id)
+		.bind(ticket_id)
+		.bind(payload.user_id)
 		.execute(&mut *tx)
 		.await;
 
@@ -298,7 +298,7 @@ pub async fn update_ticket(
 	// user rejected the ticket
 	if !payload.status {
 		let query = sqlx::query("update tickets set status='rejected' where id=$1")
-			.bind(&ticket_id)
+			.bind(ticket_id)
 			.execute(&mut *tx)
 			.await;
 		if let Err(e) = query {
@@ -307,7 +307,7 @@ pub async fn update_ticket(
 		}
 
 		let query = sqlx::query("update user_active_tickets set active=false where ticketid=$1")
-			.bind(&ticket_id)
+			.bind(ticket_id)
 			.execute(&mut *tx)
 			.await;
 		if let Err(e) = query {
@@ -346,7 +346,7 @@ pub async fn update_ticket(
 
 					let query = sqlx::query("insert into user_active_tickets (userid, ticketid, active, node_number, type_) values ($1, $2, $3, $4, $5)")
 						.bind(userid.userid)
-						.bind(&new_ticket.ticket_id)
+						.bind(new_ticket.ticket_id)
 						.bind(true)
 						.bind(new_ticket.node)
 						.bind("approve")
@@ -364,7 +364,7 @@ pub async fn update_ticket(
 				NewUserTicketType::Completion => {
 					// this ticket is always the last in the new_ticket_queue because it requires all other nodes to be executed first
 					let query = sqlx::query("update user_active_tickets set active=false where ticketid=$1")
-						.bind(&ticket_id)
+						.bind(ticket_id)
 						.execute(&mut *tx)
 						.await;
 					if let Err(e) = query {
@@ -380,9 +380,9 @@ pub async fn update_ticket(
 		// update all fields of the ticket
 		let query = sqlx::query("update tickets set status=$1, complete=$2, updated_at=$3 where id=$4")
 			.bind(&ticket.status)
-			.bind(&ticket.complete)
-			.bind(&ticket.updated_at)
-			.bind(&ticket_id)
+			.bind(ticket.complete)
+			.bind(ticket.updated_at)
+			.bind(ticket_id)
 			.execute(&mut *tx)
 			.await;
 
@@ -456,7 +456,7 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<
 		Event::Initiate => {
 			ticket.complete |= 1 << current_node;
 			ticket.update_time();
-			if next_steps.len() == 0 {
+			if next_steps.is_empty() {
 				result.status = TicketStatus::Closed;
 			}
 			log(LogType::Info, format!("Ticket {} initiated succssfully", ticket.id), ticket.log_id)
@@ -571,7 +571,7 @@ pub async fn get_user_tickets(
 			from user_active_tickets join tickets on user_active_tickets.ticketid=tickets.id 
 			join users on tickets.owner_id=users.userid
 			where user_active_tickets.type_!='own' and user_active_tickets.active='true' and user_active_tickets.userid=$1;"#)
-		.bind(&userid)
+		.bind(userid)
 		.fetch_all(&pool)
 		.await;
 	if let Err(e) = current_ticket_query {
@@ -584,7 +584,7 @@ pub async fn get_user_tickets(
 	// select all tickets from tickets where owner_id=userid
 	let own_ticket_query: Result<Vec<OwnTicket>, _> = 
 		sqlx::query_as("select id, process_id, is_public, created_at, updated_at, status from tickets where owner_id=$1;")
-		.bind(&userid)
+		.bind(userid)
 		.fetch_all(&pool)
 		.await;
 

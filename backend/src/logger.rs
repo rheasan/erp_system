@@ -17,7 +17,7 @@ pub enum LogType {
 fn public_logger(type_: &LogType, data: &String, log_id: &uuid::Uuid) -> Result<(), std::io::Error>  {
 
 	let data_dir = std::env::var("PROCESS_DATA_PATH").expect("PROCESS_DATA_PATH not defined");
-	let log_file_path = PathBuf::from(data_dir).join("public_logs").join(&log_id.to_string());
+	let log_file_path = PathBuf::from(data_dir).join("public_logs").join(log_id.to_string());
 	let mut log_file = std::fs::OpenOptions::new()
 		.append(true)
 		.create(true)
@@ -43,12 +43,16 @@ pub fn admin_logger(type_: &LogType, data: &String, log_id: Option<&uuid::Uuid>)
 
 	let data_dir = std::env::var("PROCESS_DATA_PATH").expect("PROCESS_DATA_PATH not defined");
 	let mut log_file_path = PathBuf::from(&data_dir).join("admin_logs");
-	if log_id.is_none() {
-		log_file_path = log_file_path.join("common_log");
+
+	match log_id {
+		Some(id) => {
+			log_file_path = log_file_path.join(id.to_string());
+		},
+		None => {
+			log_file_path = log_file_path.join("common_log");
+		}
 	}
-	else {
-		log_file_path = log_file_path.join(&log_id.unwrap().to_string());
-	}
+
 	let mut log_file = std::fs::OpenOptions::new()
 		.append(true)
 		.create(true)

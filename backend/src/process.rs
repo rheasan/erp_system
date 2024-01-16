@@ -58,7 +58,7 @@ fn save_process_data(data: &Process) -> Result<(), std::io::Error> {
 
 	let config_dir = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
 	let data_path = config_dir.join(format!("{}.json", pid));
-    let serialized = serde_json::to_string::<Process>(&data).unwrap();
+    let serialized = serde_json::to_string::<Process>(data).unwrap();
 
     std::fs::write(data_path, serialized)?;
     return Ok(());
@@ -146,7 +146,7 @@ pub async fn create_process(
 pub async fn get_process_data(
 	extract::Query(query) : extract::Query<ProcessDataQuery>
 ) -> Result<Json<ProcessDataResponse>, StatusCode> {
-	let pid = query.process_id.clone();
+	let pid = query.process_id;
 
 	let mut result = ProcessDataResponse {
 		active: false,
