@@ -3,6 +3,7 @@ use axum::{
     http::StatusCode,
 	extract
 };
+use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};
 use sqlx::{PgPool, FromRow};
 use std::path::PathBuf;
@@ -42,11 +43,15 @@ pub struct Job {
 	pub required: Vec<i32>
 }
 
+static CONFIG_DIR: Lazy<PathBuf> = Lazy::new(|| {
+	let path = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
+	println!("Config dir initialized to : {:?}", path.as_os_str());
+	return path;
+});
+
+
 pub fn read_process_data(pid: String) -> Result<Process, std::io::Error> {
-    // TODO: read the path from env var
-    // TODO: the process data should have static lifetime. dont read the file for every request
-	let config_dir = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
-	let data_path = config_dir.join(format!("{}.json", pid));
+	let data_path = CONFIG_DIR.join(format!("{}.json", pid));
     let process_data = std::fs::read_to_string(data_path)?;
     let parsed_data = serde_json::from_str::<Process>(&process_data)?;
 
@@ -56,8 +61,7 @@ pub fn read_process_data(pid: String) -> Result<Process, std::io::Error> {
 fn save_process_data(data: &Process) -> Result<(), std::io::Error> {
 	let pid = data.pid.clone();
 
-	let config_dir = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
-	let data_path = config_dir.join(format!("{}.json", pid));
+	let data_path = CONFIG_DIR.join(format!("{}.json", pid));
     let serialized = serde_json::to_string::<Process>(data).unwrap();
 
     std::fs::write(data_path, serialized)?;
@@ -90,8 +94,7 @@ pub async fn create_process(
 ) -> Result<StatusCode, StatusCode> {
 	let pid = payload.pid.clone();
 
-	let config_dir = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
-	let config_path = config_dir.join(format!("{}.json", pid));
+	let config_path = CONFIG_DIR.join(format!("{}.json", pid));
 	match config_path.try_exists() {
 		Err(e) => {
 			admin_logger(&LogType::Error, &format!("Error reading saved process data: {}", e), None)
@@ -153,8 +156,7 @@ pub async fn get_process_data(
 		description: None
 	};
 
-	let config_dir = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
-	let config_path = config_dir.join(format!("{}.json", pid));
+	let config_path = CONFIG_DIR.join(format!("{}.json", pid));
 	match config_path.try_exists() {
 		Err(e) => {
 			admin_logger(&LogType::Error, &format!("Error reading saved process data: {}", e), None)
