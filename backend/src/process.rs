@@ -43,6 +43,11 @@ pub struct Job {
 	pub required: Vec<i32>
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UserName {
+	pub username: String
+}
+
 static CONFIG_DIR: Lazy<PathBuf> = Lazy::new(|| {
 	let path = PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap());
 	println!("Config dir initialized to : {:?}", path.as_os_str());
@@ -68,12 +73,19 @@ fn save_process_data(data: &Process) -> Result<(), std::io::Error> {
     return Ok(());
 }
 
-// TODO: only return processes that the user has access to
 pub async fn get_all_processes(
+	extract::Query(query) : extract::Query<UserName>,
 	extract::State(pool) : extract::State<PgPool>
 ) -> Result<Json<Vec<ProcessGetResponse>>, StatusCode> {
+	let username = query.username;
 
-	let query = sqlx::query_as("select process_id, description from process_defs")
+	// query returns all process that have allowed role={any} or there is an overlap in allowed role of process and roles of the user
+	let query = sqlx::query_as(
+		r#"select p.process_id, p.description from process_defs p join 
+			(select array_agg(role_) as user_roles from roles join users on roles.userid=users.userid where users.username=$1) r 
+			on p.allowed_roles='{any}' or p.allowed_roles && r.user_roles;"#
+		)
+		.bind(username)
 		.fetch_all(&pool)
 		.await;
 
