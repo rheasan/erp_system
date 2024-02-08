@@ -1,4 +1,5 @@
 use axum::{Json, http::StatusCode, extract};
+use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};
 use sqlx::FromRow;
 use crate::{db_types::Ticket, process::{read_process_data, Process}};
@@ -82,16 +83,14 @@ struct Userid {
 	userid: uuid::Uuid
 }	
 
-fn get_event_map() -> HashMap<String, Event> {
-	//TODO: static!!!
+static EVENT_MAP: Lazy<HashMap<String, Event>> = Lazy::new(|| {
 	let mut map = HashMap::new();
 	map.insert("initiate".to_string(), Event::Initiate);
 	map.insert("approve".to_string(), Event::Approve);
 	map.insert("notify".to_string(), Event::Notify);
 	map.insert("complete".to_string(), Event::Complete);
-
 	return map;
-}
+});
 
 pub async fn create_ticket(
 	extract::State(pool): extract::State<sqlx::PgPool>,
@@ -431,8 +430,7 @@ async fn update_internal(ticket: &mut Ticket, request: &UpdateTicket) -> Result<
 }
 
 fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<&String>) -> Result<SingleExecState, ExecuteErr>{
-	// FIXME: this should be a static
-	let process_map = get_event_map();
+	let process_map = &EVENT_MAP;
 	let process_data = read_process_data(ticket.process_id.clone());
 	if let Err(e) = process_data {
 		log(LogType::Error, format!("Error reading process data: {}", e), ticket.log_id)
@@ -499,7 +497,7 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<
 	return Ok(result);
 }
 fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process) -> Result<SingleExecState, ExecuteErr>{
-	let process_map = get_event_map();
+	let process_map = &EVENT_MAP;
 	let mut result = SingleExecState {
 		status: TicketStatus::Open,
 		completable_steps: Vec::new(),
