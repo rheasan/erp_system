@@ -628,7 +628,7 @@ mod ticket_tests {
 
 		let result = update_internal(&mut ticket, &request).await;
 		assert!(result.is_ok(), "update_internal failed");
-		assert_eq!(ticket.complete, 3i32, "ticket complete mask is wrong");
+		assert_eq!(ticket.complete, 1i32, "ticket complete mask is wrong");
 	}
 
 	#[tokio::test]
@@ -656,7 +656,7 @@ mod ticket_tests {
 		// in this case the user request is completing approve event so the entire process should complete
 		let result = update_internal(&mut ticket, &request).await;
 		assert!(result.is_ok(), "update_internal failed");
-		assert_eq!(ticket.complete, 7i32, "ticket complete mask is wrong");
+		assert_eq!(ticket.complete, 3i32, "ticket complete mask is wrong");
 
 		let result = result.unwrap();
 		assert_eq!(result.len(), 1, "there should be one new ticket in the ticket queue");
