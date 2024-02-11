@@ -3,4 +3,5 @@ dist
 test_data
 target
 .env
-backend/data
+admin_logs
+public_logs
