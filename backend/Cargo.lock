@@ -850,6 +850,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "notifier"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "once_cell",
+]
+
+[[package]]
 name = "num-bigint-dig"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
