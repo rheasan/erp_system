@@ -16,6 +16,7 @@ pub mod db_types;
 pub mod ticket;
 pub mod utils;
 pub mod logger;
+pub mod notif_handler;
 
 
 #[tokio::main]

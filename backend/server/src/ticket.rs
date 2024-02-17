@@ -5,6 +5,7 @@ use sqlx::FromRow;
 use crate::{db_types::Ticket, process::{read_process_data, Process}};
 use std::collections::{HashMap, VecDeque};
 use crate::{utils, logger::{LogType, log, admin_logger}};
+use crate::notif_handler::{Ping, ping_notifier};
 
 #[derive(Eq, PartialEq)]
 pub enum Event {Initiate, Approve, Notify, Complete}
@@ -27,7 +28,7 @@ pub struct SingleExecState {
 	pub completable_steps : Vec<i32>,
 }
 #[derive(Debug)]
-pub enum ExecuteErr {InvalidTicket, FailedToExecute, InvalidEvent, FailedToReadProcessData, FailedToLog}
+pub enum ExecuteErr {InvalidTicket, FailedToExecute, InvalidEvent, FailedToReadProcessData, FailedToLog, FailedToNotify}
 #[derive(Serialize, Deserialize)]
 pub struct CreateTicket {
 	pub process_id: String,
@@ -81,7 +82,12 @@ pub struct GetUserTicketsReq {
 #[derive(Serialize, FromRow, Deserialize)]
 struct Userid {
 	userid: uuid::Uuid
-}	
+}
+
+#[derive(Serialize, FromRow, Deserialize)]
+struct Username {
+	username: String
+}
 
 static EVENT_MAP: Lazy<HashMap<String, Event>> = Lazy::new(|| {
 	let mut map = HashMap::new();
@@ -201,7 +207,38 @@ pub async fn create_ticket(
 				log(LogType::Request, format!("Ticket {} approval requested from {}", ticket.id, userid.userid), ticket.log_id)?;
 			}
 			NewUserTicketType::Notify => {
-				todo!("implement notify logic")
+				// insert a new ticket into notifications table and ping the notifier server
+
+				let owner_name_query: Result<Username, _> = sqlx::query_as("select username from users where userid=$1")
+					.bind(ticket.owner_id)
+					.fetch_one(&mut *tx)
+					.await;
+
+				if let Err(e) = owner_name_query {
+					admin_logger(&LogType::Error, &format!("failed to get owner name in notification NewUserTicket. create request from {}. Error: {}", ticket.owner_id, e), None)
+						.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
+					return Err(StatusCode::INTERNAL_SERVER_ERROR);
+				}
+				let message = format!("Ticket created by {}. Process Id: {}", ticket.owner_id, ticket.process_id);
+
+				let notified_username = new_ticket.username.as_ref().unwrap();
+
+				// add notification
+				let query = sqlx::query("insert into notifications (userid, message, created_at) values ((select userid from users where username=$1), $2, $3)")
+					.bind(notified_username)
+					.bind(message)
+					.bind(chrono::Utc::now())
+					.execute(&mut *tx)
+					.await;
+
+				if let Err(e) = query {
+					admin_logger(&LogType::Error, &format!("failed to add notification in NewUserTicket. create request from {}, Error: {}", ticket.owner_id, e), None)
+						.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
+					return Err(StatusCode::INTERNAL_SERVER_ERROR);
+				}
+				
+				log(LogType::NotificationSuccess, format!("Notification sent to notifier for user {} notified for ticket {}", notified_username, ticket.id), ticket.log_id)
+					.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 			}
 			NewUserTicketType::Completion => {
 				// this ticket is always the last in the new_ticket_queue because it requires all other nodes to be executed first
@@ -241,6 +278,16 @@ pub async fn create_ticket(
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
+	// notifier server should be pinged only after completing the transaction.
+	// failure to ping is recoverable so dont return 500 if it fails
+	// when the server is successfully pinged later current notifications will be sent
+	if let Err(_e) = ping_notifier(Ping::CollectNew).await {
+		// FIXME: this might silently fail
+		let _ = admin_logger(&LogType::FailedToPing, 
+			&format!("Failed to ping server for new notification node in NewUserTicket. create request from {}", ticket.owner_id), 
+			None
+		);
+	}
 	return Ok(StatusCode::CREATED);
 }
 #[axum::debug_handler]
@@ -460,11 +507,6 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<
 			log(LogType::Info, format!("Ticket {} initiated succssfully", ticket.id), ticket.log_id)
 				.map_err(|_| ExecuteErr::FailedToLog)?;
 		}
-		Event::Notify => {
-			ticket.complete |= 1 << current_node;
-			ticket.update_time();
-			todo!("implement notify event logic")
-		}
 		Event::Approve => {
 			ticket.complete |= 1 << current_node;
 			ticket.update_time();
@@ -472,6 +514,13 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<
 				format!("Ticket {} approved by {}, message: {}", ticket.id, current_job.args.unwrap()[0], message.unwrap_or(&"none".to_string())),
 				ticket.log_id)
 				.map_err(|_| ExecuteErr::FailedToLog)?;
+		}
+		Event::Notify => {
+			// this event cannot be reached through user request.
+			// Notify nodes in a process are completed instantly and only send a notification about the ticket to the given user
+			log(LogType::Error, format!("Attempt to complete notify node for tickt {} from {}", ticket.id, current_job.args.unwrap()[0]), ticket.log_id)
+				.map_err(|_e| ExecuteErr::FailedToLog)?;
+			return Err(ExecuteErr::InvalidTicket);
 		}
 		Event::Complete => {
 			// no user should be able to complete this event
