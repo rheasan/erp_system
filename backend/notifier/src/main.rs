@@ -35,17 +35,15 @@ fn handle_pings(tx: Sender<Ping>){
 				println!("New incoming connection from {:?}", addr);
 				//continuously read 8 bytes from the connection
 				let mut buf = [0u8; 8];
-				loop {
-					stream.read_exact(&mut buf).unwrap();
-					let data = u64::from_ne_bytes(buf);
+				stream.read_exact(&mut buf).unwrap();
+				let data = u64::from_ne_bytes(buf);
 
-					match data {
-						1 => tx.send(Ping::CollectNew).unwrap(),
-						2 => tx.send(Ping::Clear).unwrap(),
-						_ => eprintln!("[Error] [{}] Malformed ping received.", Local::now())
-					}
-					println!("Received data: {}", data);
+				match data {
+					1 => tx.send(Ping::CollectNew).unwrap(),
+					2 => tx.send(Ping::Clear).unwrap(),
+					_ => eprintln!("[Error] [{}] Malformed ping received.", Local::now())
 				}
+				println!("Received data: {}", data);
 			}
 			Err(e) => {
 				eprintln!("Connection failed. {}", e);
