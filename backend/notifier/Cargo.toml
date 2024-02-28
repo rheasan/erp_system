@@ -8,3 +8,8 @@ edition = "2021"
 [dependencies]
 chrono.workspace = true
 once_cell.workspace = true
+tokio-tungstenite = "0.21"
+futures = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+tokio = { workspace = true, features = ["full"] }
+dotenv.workspace = true
