@@ -14,6 +14,10 @@ pub fn check_n_complete(complete_mask: i32, num_nodes: i32) -> bool {
 	return complete_mask.trailing_ones() == (num_nodes - 1) as u32;
 }
 
+pub fn gen_random_token(userid: &uuid::Uuid) -> String {
+	// TODO: maybe use something else
+	return format!("{}-{}", userid, uuid::Uuid::new_v4());
+}
 
 #[cfg(test)]
 mod utils_test {
@@ -44,4 +48,11 @@ mod utils_test {
 		assert_eq!(check_n_complete(complete_mask, num_nodes), false);
 	}
 
+	#[test]
+	fn check_token_gen() {
+		let userid = uuid::Uuid::new_v4();
+		let res = gen_random_token(&userid);
+		// 36+1+36 chars
+		assert_eq!(res.len(), 73);
+	}
 }

@@ -78,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.route("/ticket", post(ticket::create_ticket))
 		.route("/ticket/user", get(ticket::get_user_tickets))
 		.route("/ticket/update", post(ticket::update_ticket))
+		.route("/notifier/request_token", post(notif_handler::gen_token))
 		.layer(cors)
 		.with_state(pool);
 

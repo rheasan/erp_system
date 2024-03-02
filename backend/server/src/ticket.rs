@@ -281,7 +281,7 @@ pub async fn create_ticket(
 	// notifier server should be pinged only after completing the transaction.
 	// failure to ping is recoverable so dont return 500 if it fails
 	// when the server is successfully pinged later current notifications will be sent
-	if let Err(_e) = ping_notifier(Ping::CollectNew).await {
+	if let Err(_e) = ping_notifier(Ping::CollectNew, None).await {
 		// FIXME: this might silently fail
 		let _ = admin_logger(&LogType::FailedToPing, 
 			&format!("Failed to ping server for new notification node in NewUserTicket. create request from {}", ticket.owner_id), 
