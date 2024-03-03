@@ -26,7 +26,7 @@ struct NewClientData {
 	expires_at: i64
 }
 
-#[derive(Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Serialize, Deserialize, sqlx::FromRow, Clone)]
 struct Notification {
 	userid: uuid::Uuid,
 	messages: Vec<(String, chrono::DateTime<chrono::Utc>)>,
@@ -39,7 +39,7 @@ static NEW_CLIENT_QUEUE : Lazy<Mutex<HashMap<String,NewClientData>>> = Lazy::new
 	return Mutex::new(HashMap::new());
 });
 
-static CONNECTED_CLIENTS : Lazy<Mutex<HashMap<String,UnboundedSender<Notification>>>> = Lazy::new(|| {
+static CONNECTED_CLIENTS : Lazy<Mutex<HashMap<String,Vec<UnboundedSender<Notification>>>>> = Lazy::new(|| {
 	return Mutex::new(HashMap::new());
 });
 
@@ -47,6 +47,7 @@ static CONNECTED_CLIENTS : Lazy<Mutex<HashMap<String,UnboundedSender<Notificatio
 
 // all new client tokens will expire in 10 sec
 static NEW_TOKEN_EXPIRY : u64 = 10000u64;
+static MAX_CLIENTS_PER_USER : usize = 3usize;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -142,7 +143,17 @@ async fn handle_socket(stream: TcpStream, addr: SocketAddr) {
 	let (client_tx, mut client_rx) = unbounded_channel::<Notification>();
 	{
 		let mut guard = CONNECTED_CLIENTS.lock().await;
-		guard.insert(client_userid.clone(), client_tx);
+		if guard.contains_key(&client_userid){
+			let clients = guard.get_mut(&client_userid).unwrap();
+			if clients.len() == MAX_CLIENTS_PER_USER {
+				eprintln!("[WARNING] [{}] User: {} attemted to connect more than max allowed clients.", Local::now(), client_userid);
+				return;
+			}
+			clients.push(client_tx);
+		}
+		else {
+			guard.insert(client_userid.clone(), vec![client_tx]);
+		}
 		println!("[INFO] [{}] Client: {}, userid: {} successfully connected", Local::now(), addr.to_string(), client_userid);
 	}
 
@@ -261,8 +272,11 @@ async fn pull_notifications(mut notif_rx: UnboundedReceiver<()>) {
 				if !guard.contains_key(&userid) {
 					continue;
 				}
-
-				guard.get(&userid).unwrap().send(notif).unwrap();
+				let clients = guard.get(&userid).unwrap();
+				for client in clients {
+					// TODO: maybe put the notif in a box to avoid cloning
+					client.send(notif.clone()).unwrap();
+				}
 			}
 		}
 
