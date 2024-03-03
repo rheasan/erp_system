@@ -9,9 +9,11 @@ pub enum LogType {
 	UploadSuccess,
 	Rejection,
 	Request,
+	NotificationSuccess,
 	Warning,
 	Error,
-	Completion
+	Completion,
+	FailedToPing
 }
 
 fn public_logger(type_: &LogType, data: &String, log_id: &uuid::Uuid) -> Result<(), std::io::Error>  {
@@ -30,6 +32,7 @@ fn public_logger(type_: &LogType, data: &String, log_id: &uuid::Uuid) -> Result<
 		LogType::Request => "REQUEST",
 		LogType::Completion => "COMPLETION",
 		LogType::Info => "INFO",
+		LogType::NotificationSuccess => "NOTIFICATION_SUCCESS",
 		_ => unreachable!()
 	};
 
@@ -67,6 +70,8 @@ pub fn admin_logger(type_: &LogType, data: &String, log_id: Option<&uuid::Uuid>)
 		LogType::UploadSuccess => "UPLOAD_SUCCESS",
 		LogType::Request => "REQUEST",
 		LogType::Completion => "COMPLETION",
+		LogType::FailedToPing => "FAILED_TO_PING",
+		LogType::NotificationSuccess => "NOTIFICATION_SUCCESS"
 	};
 
 	let log = format!("[{}] [{}] {}\n", log_type, chrono::Local::now().to_rfc3339(), data);
@@ -77,7 +82,8 @@ pub fn admin_logger(type_: &LogType, data: &String, log_id: Option<&uuid::Uuid>)
 
 pub fn log(type_: LogType, data: String, log_id: uuid::Uuid) -> Result<(), StatusCode> {
 	match type_ {
-		LogType::Approval | LogType::Rejection | LogType::UploadSuccess | LogType::Request | LogType::Completion | LogType::Info => {
+		LogType::Approval | LogType::Rejection | LogType::UploadSuccess | LogType::Request | 
+		LogType::Completion | LogType::Info | LogType::NotificationSuccess => {
 			public_logger(&type_, &data, &log_id).map_err(|e| {
 				eprintln!("Unable to write to log file: {}, log_id: {}", e, log_id);
 				return StatusCode::INTERNAL_SERVER_ERROR;
