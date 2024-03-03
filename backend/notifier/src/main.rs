@@ -17,11 +17,12 @@ use tokio::{select, task};
 enum Ping {
     CollectNew,
     Clear,
-	ClientIdTransfer(String)
+	ClientIdDataTransfer((String, String))
 }
 
 struct NewClientData {
 	token: String,
+	userid: String,
 	// https://docs.rs/chrono/latest/chrono/struct.DateTime.html#method.timestamp
 	expires_at: i64
 }
@@ -123,30 +124,31 @@ async fn handle_socket(stream: TcpStream, addr: SocketAddr) {
 		eprintln!("[Error] [{}] Client: {} did not send token", Local::now(), addr.to_string());
 		return;
 	}
-	let client_id = data.unwrap();
-	if !client_id.is_text() {
+	let client_token = data.unwrap();
+	if !client_token.is_text() {
 		eprintln!("[Error] [{}] Client: {} did not send text message for token", Local::now(), addr.to_string());
 		return;
 	}
-	let client_id = client_id.into_text().unwrap();
-	let client_userid = client_id.split_at(36).0.to_string();
+	let client_token = client_token.to_text().unwrap().to_string();
+	let client_userid: String;
 	// check if the token is valid
 	{
 		let cur_time = chrono::Utc::now().timestamp();
 		let mut guard = NEW_CLIENT_QUEUE.lock().await;
-		let saved_token = guard.get_mut(&client_id);
+		let saved_token = guard.get_mut(&client_token);
 		if saved_token.is_none() {
 			eprintln!("[Error] [{}] Client: {} sent invalid token", Local::now(), addr.to_string());
 			return;
 		}
 		let saved_token = saved_token.unwrap();
-		if saved_token.expires_at >= cur_time {
+		if cur_time >= saved_token.expires_at {
 			// this token will be removed by the cleaner thread later so no need to do it now
 			eprintln!("[Error] [{}] Client: {} sent expired token", Local::now(), addr.to_string());
 			return;
 		}
-		// clear the token
+		// clear the token and take the userid of the token
 		saved_token.token = String::new();
+		client_userid = saved_token.userid.clone();
 	}
 
 	// add the client to connected clients
@@ -194,16 +196,23 @@ async fn handle_pings(tx: UnboundedSender<Ping>) {
                     1 => tx.send(Ping::CollectNew).unwrap(),
                     2 => tx.send(Ping::Clear).unwrap(),
 					3 => {
-						// the client id should be 73 characters
-						let mut data_buf = [0u8; 73];
-						stream.read_exact(&mut data_buf).await.unwrap();
-						let data_buf = data_buf.to_vec();
-						// TODO: dont clone this
-						let client_id = String::from_utf8(data_buf.clone());
+						// the client id should be 36 characters
+						let mut buf = [0u8; 36];
+						stream.read_exact(&mut buf).await.unwrap();
+						let data_buf = buf.to_vec();
+						let client_id = String::from_utf8(data_buf);
 						if let Err(_) = client_id {
-							eprintln!("[Error] [{}] Failed to parse client id. Bytes received: {:?}", Local::now(), data_buf);
+							eprintln!("[Error] [{}] Failed to parse client id. Bytes received: {:?}", Local::now(), buf);
 						}
-						tx.send(Ping::ClientIdTransfer(client_id.unwrap())).unwrap();
+
+						stream.read_exact(&mut buf).await.unwrap();
+						let data_buf = buf.to_vec();
+						let client_token = String::from_utf8(data_buf);
+						if let Err(_) = client_token {
+							eprintln!("[Error] [{}] Failed to parse client token. Bytes received: {:?}", Local::now(), buf);
+						}
+
+						tx.send(Ping::ClientIdDataTransfer((client_id.unwrap(), client_token.unwrap()))).unwrap();
 						
 					}
                     _ => eprintln!("[Error] [{}] Malformed ping received.", Local::now()),
@@ -226,19 +235,21 @@ async fn exec_ping(mut ping_rx: UnboundedReceiver<Ping>, notif_tx: UnboundedSend
                 println!("[INFO] [{}] Collect New Ping received", Local::now());
 				notif_tx.send(()).unwrap();
             }
-			Ping::ClientIdTransfer(client_id) => {
-				println!("[INFO] [{}] Client id received: {}", Local::now(), client_id);
+			Ping::ClientIdDataTransfer(client_data) => {
+				let (client_userid, client_token) = client_data;
+				println!("[INFO] [{}] Client data received: userid: {}, token: {}", Local::now(), client_userid, client_token);
 				// add the client_id to the map
 				{
 					// when MutexGuard falls out of scope the Mutex will be unlocked
-					let time = chrono::Utc::now().timestamp();
+					let time = chrono::Utc::now().timestamp() + NEW_TOKEN_EXPIRY as i64;
 					let data = NewClientData {
-						token: client_id.clone(),
+						userid: client_userid.to_string(),
+						token: client_token.to_string(),
 						expires_at: time
 					};
 					// TODO: if the guard is not returned before out token expires then what???
 					let mut guard = NEW_CLIENT_QUEUE.lock().await;
-					guard.insert(client_id, data);
+					guard.insert(client_token.to_string(), data);
 				}
 			}
         }

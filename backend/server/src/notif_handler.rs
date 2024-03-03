@@ -29,7 +29,7 @@ static NOTIF_ADDR : Lazy<SocketAddr> = Lazy::new(|| {
 	return SocketAddr::from(([127, 0, 0, 1], notifier_port));
 });
 
-pub async fn ping_notifier(type_: Ping, data: Option<String>) -> Result<(), ExecuteErr> {
+pub async fn ping_notifier(type_: Ping, data: Option<(String, String)>) -> Result<(), ExecuteErr> {
 	let bytes = match type_ {
 		Ping::CollectNew => 1u64.to_le_bytes(),
 		Ping::Clear => 2u64.to_le_bytes(),
@@ -55,9 +55,18 @@ pub async fn ping_notifier(type_: Ping, data: Option<String>) -> Result<(), Exec
 	}
 
 	if type_ == Ping::ClientIdTransfer {
-		// send the client id to the notifier
-		let data = data.unwrap();
-		let bytes = data.as_bytes();
+		// send the client data to the notifier
+		let (userid, token)= data.unwrap();
+		let bytes = userid.as_bytes();
+		let res = conn.write(&bytes).await;
+
+		if let Err(e) = res {
+			admin_logger(&LogType::FailedToPing, &format!("Failed to write data to socket after successful ping. e: {}", e), None)
+				.map_err(|_e| FailedToLog)?;
+			return Err(FailedToNotify);
+		}
+
+		let bytes = token.as_bytes();
 		let res = conn.write(&bytes).await;
 
 		if let Err(e) = res {
@@ -75,10 +84,9 @@ pub async fn gen_token(
 ) -> Result<Json<TokenResponse>, StatusCode> {
 	let userid = req.userid;
 
-	let token = utils::gen_random_token(&userid);
-
+	let token = utils::gen_random_token();
 	// tell notifier about this token
-	if let Err(_) = ping_notifier(Ping::ClientIdTransfer, Some(token.clone())).await {
+	if let Err(_) = ping_notifier(Ping::ClientIdTransfer, Some((userid.to_string(), token.clone()))).await {
 		admin_logger(&LogType::FailedToPing, &format!("Failed to send client token to notifier. userid: {}.", userid), None)
 			.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
