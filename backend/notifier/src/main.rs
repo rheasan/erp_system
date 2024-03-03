@@ -132,11 +132,21 @@ async fn handle_socket(stream: TcpStream, addr: SocketAddr) {
 	let client_userid = client_id.split_at(36).0.to_string();
 	// check if the token is valid
 	{
-		let guard = NEW_CLIENT_QUEUE.lock().await;
-		if !guard.contains_key(&client_id) {
-			eprintln!("[Error] [{}] Client: {} sent invalid or expired token", Local::now(), addr.to_string());
+		let cur_time = chrono::Utc::now().timestamp();
+		let mut guard = NEW_CLIENT_QUEUE.lock().await;
+		let saved_token = guard.get_mut(&client_id);
+		if saved_token.is_none() {
+			eprintln!("[Error] [{}] Client: {} sent invalid token", Local::now(), addr.to_string());
 			return;
 		}
+		let saved_token = saved_token.unwrap();
+		if saved_token.expires_at >= cur_time {
+			// this token will be removed by the cleaner thread later so no need to do it now
+			eprintln!("[Error] [{}] Client: {} sent expired token", Local::now(), addr.to_string());
+			return;
+		}
+		// clear the token
+		saved_token.token = String::new();
 	}
 
 	// add the client to connected clients
