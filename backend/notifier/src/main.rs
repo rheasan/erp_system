@@ -40,7 +40,7 @@ static NEW_CLIENT_QUEUE : Lazy<Mutex<HashMap<String,NewClientData>>> = Lazy::new
 	return Mutex::new(HashMap::new());
 });
 
-static CONNECTED_CLIENTS : Lazy<Mutex<HashMap<String,Vec<UnboundedSender<Notification>>>>> = Lazy::new(|| {
+static CONNECTED_CLIENTS : Lazy<Mutex<HashMap<String,Vec<(String, UnboundedSender<Notification>)>>>> = Lazy::new(|| {
 	return Mutex::new(HashMap::new());
 });
 
@@ -154,6 +154,7 @@ async fn handle_socket(stream: TcpStream, addr: SocketAddr) {
 	// add the client to connected clients
 	let (client_tx, mut client_rx) = unbounded_channel::<Notification>();
 	{
+		let client_token = client_token.clone();
 		let mut guard = CONNECTED_CLIENTS.lock().await;
 		if guard.contains_key(&client_userid){
 			let clients = guard.get_mut(&client_userid).unwrap();
@@ -161,19 +162,79 @@ async fn handle_socket(stream: TcpStream, addr: SocketAddr) {
 				eprintln!("[WARNING] [{}] User: {} attemted to connect more than max allowed clients.", Local::now(), client_userid);
 				return;
 			}
-			clients.push(client_tx);
+			clients.push((client_token, client_tx));
 		}
 		else {
-			guard.insert(client_userid.clone(), vec![client_tx]);
+			guard.insert(client_userid.clone(), vec![(client_token, client_tx)]);
 		}
 		println!("[INFO] [{}] Client: {}, userid: {} successfully connected", Local::now(), addr.to_string(), client_userid);
 	}
 
 	// send notifications to client
-	while let Some(notifications) = client_rx.recv().await {
-		let serialized = to_string(&notifications.messages).unwrap();
-		send.send(Message::Text(serialized)).await.unwrap();
+	let mut send_task = task::spawn({
+		let client_userid = client_userid.clone();
+		async move {
+			loop {
+				let notif = client_rx.recv().await;
+				if notif.is_none() {
+					// channel closed
+					return;
+				}
+				let notif = notif.unwrap();
+				let serialized = to_string(&notif.messages).unwrap();
+				match send.send(Message::Text(serialized)).await {
+					Ok(_) => {}
+					Err(e) => {
+						eprintln!("[Error] [{}] Failed to send msg to client: {} userid: {}. Error: {}", Local::now(), addr.to_string(), client_userid, e);
+						return;
+					}
+				}
+			}
+		}
+	});
+	let mut recv_task = task::spawn({
+		let client_userid = client_userid.clone();
+		async move {
+			loop {
+				let res = recv.try_next().await;
+				if let Err(_) = res {
+					// client unexpectedly disconnected
+					return;
+				}
+				let msg = res.unwrap();
+				if msg.is_none() {
+					eprintln!("[Warning] [{}] Empty (keep-alive?) msg from client: {} userid: {}", Local::now(), addr.to_string(), client_userid);
+				}
+				let msg = msg.unwrap();
+				if msg.is_close() {
+					println!("[INFO] [{}] Received close msg from client: {} userid: {}", Local::now(), addr.to_string(), client_userid);
+					return;
+				}
+			}
+		}
+	});
+
+	select! {
+		_ = (&mut recv_task) => {
+			send_task.abort();
+		}
+		_ = (&mut send_task) => {
+			recv_task.abort();
+		}
 	}
+
+	// remove the client
+	{
+		let mut guard = CONNECTED_CLIENTS.lock().await;
+		let conn = guard.get_mut(&client_userid).unwrap();
+		if conn.len() == 1 {
+			guard.remove(&client_userid);
+		}
+		else {
+			conn.retain(|(f, _)| *f != client_token );
+		}
+	}
+
 	println!("[INFO] [{}] Client: {}, userid: {} disconnected", Local::now(), addr.to_string(), client_userid);
 }
 
@@ -296,7 +357,7 @@ async fn pull_notifications(mut notif_rx: UnboundedReceiver<()>) {
 				let clients = guard.get(&userid).unwrap();
 				for client in clients {
 					// TODO: maybe put the notif in a box to avoid cloning
-					client.send(notif.clone()).unwrap();
+					client.1.send(notif.clone()).unwrap();
 				}
 			}
 		}
