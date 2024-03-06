@@ -361,6 +361,14 @@ async fn pull_notifications(mut notif_rx: UnboundedReceiver<()>) {
 				}
 			}
 		}
+		let query = sqlx::query("delete from notifications")
+			.execute(&mut *transaction)
+			.await;
+
+		if let Err(e) = query {
+			eprintln!("[Error] [{}] Failed to query db. Error: {}", Local::now(), e);
+			return;
+		}
 
 		transaction.commit().await.expect("Failed to commit transaction");
 	}
