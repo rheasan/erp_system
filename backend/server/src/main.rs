@@ -62,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.await
 		.expect("Unable to connect to db");
 
-    let app = Router::new()
+	let app = Router::new()
 		.route("/", get(say_hello))
 		.route("/process/all", get(process::get_all_processes))
 		.route("/process", get(process::get_process_data))
@@ -82,16 +82,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.layer(cors)
 		.with_state(pool);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    println!("Running on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+	let addr = SocketAddr::from(([0, 0, 0, 0], port));
+	println!("Running on {}", addr);
+	axum::Server::bind(&addr)
+		.serve(app.into_make_service())
+		.await
+		.unwrap();
 
-    Ok(())
+	Ok(())
 }
 
 async fn say_hello() -> &'static str {
-    "Hello, world!"
+	"Hello, world!"
 }

@@ -15,8 +15,8 @@ use std::time::Duration;
 use tokio::{select, task};
 
 enum Ping {
-    CollectNew,
-    Clear,
+	CollectNew,
+	Clear,
 	ClientIdDataTransfer((String, String))
 }
 
@@ -52,21 +52,21 @@ static MAX_CLIENTS_PER_USER : usize = 3usize;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv::dotenv().ok();
-    let ws_port = std::env::var("SOCKET_SERVER_PORT").expect("SOCKET_SERVER_PORT not defined");
-    let ws_port = ws_port.parse::<u16>().unwrap();
+	dotenv::dotenv().ok();
+	let ws_port = std::env::var("SOCKET_SERVER_PORT").expect("SOCKET_SERVER_PORT not defined");
+	let ws_port = ws_port.parse::<u16>().unwrap();
 
-    // handle pings from backend to notifier
+	// handle pings from backend to notifier
 	let (ping_tx, ping_rx) = unbounded_channel::<Ping>();
 	let (notif_tx, notif_rx) = unbounded_channel::<()>();
 
-    let ping_thread = task::spawn(async move {
-        let tx = ping_tx.clone();
-        handle_pings(tx).await;
-    });
-    let notif_thread = task::spawn(async move {
-        exec_ping(ping_rx, notif_tx).await;
-    });
+	let ping_thread = task::spawn(async move {
+		let tx = ping_tx.clone();
+		handle_pings(tx).await;
+	});
+	let notif_thread = task::spawn(async move {
+		exec_ping(ping_rx, notif_tx).await;
+	});
 	let cleaner_thread = task::spawn(async {
 		clean_queue().await;
 	});
@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			eprintln!("[Error] [{}] Pull thread failed", Local::now());
 		}
 	}
-    Ok(())
+	Ok(())
 }
 
 async fn handle_socket(stream: TcpStream, addr: SocketAddr) {
@@ -239,23 +239,23 @@ async fn handle_socket(stream: TcpStream, addr: SocketAddr) {
 }
 
 async fn handle_pings(tx: UnboundedSender<Ping>) {
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3003));
-    let listner = TcpListener::bind(addr).await.unwrap();
-    println!("[INFO] [{}] Listening to server on {:?}", Local::now(), addr);
+	let addr = SocketAddr::from(([0, 0, 0, 0], 3003));
+	let listner = TcpListener::bind(addr).await.unwrap();
+	println!("[INFO] [{}] Listening to server on {:?}", Local::now(), addr);
 
-    loop {
-        // accept will block the current thread
-        let conn = listner.accept().await;
-        match conn {
-            Ok((mut stream, _addr)) => {
-                //continuously read 8 bytes from the connection
-                let mut buf = [0u8; 8];
-                stream.read_exact(&mut buf).await.unwrap();
-                let data = u64::from_ne_bytes(buf);
+	loop {
+		// accept will block the current thread
+		let conn = listner.accept().await;
+		match conn {
+			Ok((mut stream, _addr)) => {
+				//continuously read 8 bytes from the connection
+				let mut buf = [0u8; 8];
+				stream.read_exact(&mut buf).await.unwrap();
+				let data = u64::from_ne_bytes(buf);
 
-                match data {
-                    1 => tx.send(Ping::CollectNew).unwrap(),
-                    2 => tx.send(Ping::Clear).unwrap(),
+				match data {
+					1 => tx.send(Ping::CollectNew).unwrap(),
+					2 => tx.send(Ping::Clear).unwrap(),
 					3 => {
 						// the client id should be 36 characters
 						let mut buf = [0u8; 36];
@@ -276,26 +276,26 @@ async fn handle_pings(tx: UnboundedSender<Ping>) {
 						tx.send(Ping::ClientIdDataTransfer((client_id.unwrap(), client_token.unwrap()))).unwrap();
 						
 					}
-                    _ => eprintln!("[Error] [{}] Malformed ping received.", Local::now()),
-                }
-            }
-            Err(e) => {
-                eprintln!("[Error] [{}] Connection failed. {}", Local::now(), e);
-            }
-        }
-    }
+					_ => eprintln!("[Error] [{}] Malformed ping received.", Local::now()),
+				}
+			}
+			Err(e) => {
+				eprintln!("[Error] [{}] Connection failed. {}", Local::now(), e);
+			}
+		}
+	}
 }
 
 async fn exec_ping(mut ping_rx: UnboundedReceiver<Ping>, notif_tx: UnboundedSender<()>) {
-    while let Some(ping) = ping_rx.recv().await {
-        match ping {
-            Ping::Clear => {
-                println!("[INFO] [{}] Clear ping received", Local::now());
-            }
-            Ping::CollectNew => {
-                println!("[INFO] [{}] Collect New Ping received", Local::now());
+	while let Some(ping) = ping_rx.recv().await {
+		match ping {
+			Ping::Clear => {
+				println!("[INFO] [{}] Clear ping received", Local::now());
+			}
+			Ping::CollectNew => {
+				println!("[INFO] [{}] Collect New Ping received", Local::now());
 				notif_tx.send(()).unwrap();
-            }
+			}
 			Ping::ClientIdDataTransfer(client_data) => {
 				let (client_userid, client_token) = client_data;
 				println!("[INFO] [{}] Client data received: userid: {}, token: {}", Local::now(), client_userid, client_token);
@@ -313,9 +313,9 @@ async fn exec_ping(mut ping_rx: UnboundedReceiver<Ping>, notif_tx: UnboundedSend
 					guard.insert(client_token.to_string(), data);
 				}
 			}
-        }
-    }
-    return;
+		}
+	}
+	return;
 }
 
 // TODO: impl better cleaning algorithm

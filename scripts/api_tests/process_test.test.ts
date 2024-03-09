@@ -27,22 +27,22 @@ const correct_data: Process = {
   "pname": "process for recruiting staff under research project",
   "pid": "TEST",
   "steps": [
-    { "event": "initiate", "args": [], "next": [1], "required": [] },
-    {
-      "event": "approve",
-      "args": ["a_registrar_r_d"],
-      "next": [2],
-      "required": [0]
-    },
-    {
-      "event": "approve",
-      "args": ["a_dean_r_d"],
-      "next": [3],
-      "required": [1]
-    },
-    { "event": "approve", "args": ["director"], "next": [4], "required": [2] },
-    { "event": "notify", "args": ["director"], "next": [5], "required": [3] },
-    { "event": "complete", "args": null, "next": [], "required": [4] }
+	{ "event": "initiate", "args": [], "next": [1], "required": [] },
+	{
+	  "event": "approve",
+	  "args": ["a_registrar_r_d"],
+	  "next": [2],
+	  "required": [0]
+	},
+	{
+	  "event": "approve",
+	  "args": ["a_dean_r_d"],
+	  "next": [3],
+	  "required": [1]
+	},
+	{ "event": "approve", "args": ["director"], "next": [4], "required": [2] },
+	{ "event": "notify", "args": ["director"], "next": [5], "required": [3] },
+	{ "event": "complete", "args": null, "next": [], "required": [4] }
   ],
   "desc": "process for recruiting staff under research project",
   "roles" : ["any"]
@@ -50,22 +50,22 @@ const correct_data: Process = {
 const incorrect_data = {
   "pname": "process for recruiting staff under research project",
   "steps": [
-    { "event": "initiate", "args": [], "next": [1], "required": [] },
-    {
-      "event": "approve",
-      "args": ["a_registrar_r_d"],
-      "next": [2],
-      "required": [0]
-    },
-    {
-      "event": "approve",
-      "args": ["a_dean_r_d"],
-      "next": [3],
-      "required": [1]
-    },
-    { "event": "approve", "args": ["director"], "next": [4], "required": [2] },
-    { "event": "notify", "args": ["director"], "next": [5], "required": [3] },
-    { "event": "complete", "args": null, "next": [], "required": [4] }
+	{ "event": "initiate", "args": [], "next": [1], "required": [] },
+	{
+	  "event": "approve",
+	  "args": ["a_registrar_r_d"],
+	  "next": [2],
+	  "required": [0]
+	},
+	{
+	  "event": "approve",
+	  "args": ["a_dean_r_d"],
+	  "next": [3],
+	  "required": [1]
+	},
+	{ "event": "approve", "args": ["director"], "next": [4], "required": [2] },
+	{ "event": "notify", "args": ["director"], "next": [5], "required": [3] },
+	{ "event": "complete", "args": null, "next": [], "required": [4] }
   ],
   "desc": "process for recruiting staff under research project",
   "roles" : ["any"]

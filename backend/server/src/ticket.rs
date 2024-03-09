@@ -648,10 +648,10 @@ pub async fn get_user_tickets(
 
 #[cfg(test)]
 mod ticket_tests {
-    use crate::db_types::Ticket;
+	use crate::db_types::Ticket;
 	use dotenv;
 
-    use super::{update_internal, NewUserTicketType};
+	use super::{update_internal, NewUserTicketType};
 
 	#[tokio::test]
 	async fn check_2_node_process() {
