@@ -121,3 +121,36 @@ test("/process/all works", async () => {
 
 	expectTypeOf(json).toMatchTypeOf(Array<{process_id: string, description: string}>);
 });
+
+describe("/process/get_process works", async () => {
+	const local_data = structuredClone(correct_data);
+	local_data.pid = "TEST2";
+	const res = await fetch(api_url + "/process", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json"
+		},
+		body: JSON.stringify(local_data)
+	});
+	test("API returned StatusCode::CREATED", () => {
+		expect(res.status).toBe(201);
+	});
+	test("Process was added to db", async () => {
+		const db_res = await sql`select count(*) from process_defs where process_id='TEST2'`;
+		expect(db_res.length).toBe(1);
+	});
+
+	test("Process data can be fetched correctly", async () => {
+		const res = await fetch(api_url + "/process?process_id=TEST2");
+		const process : {active: boolean, description: string} = await res.json();
+		// test2's initiate node does not allow additional data for ticket creation so this will be empty
+		expect(process.active).toBe(false);
+		// this is not the same as desc provided in the process definition
+		expect(process.description).toBeNull();
+	});
+	// cleanup
+	afterAll(async () => {
+		await sql`delete from process_defs where process_id='TEST2'`;
+		await fs.rm(path.join(process.env.PROCESS_DATA_DIR!, "TEST2.json"));
+	});
+})
