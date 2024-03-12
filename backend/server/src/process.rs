@@ -1,6 +1,6 @@
 use axum::{
-    Json,
-    http::StatusCode,
+	Json,
+	http::StatusCode,
 	extract
 };
 use once_cell::sync::Lazy;
@@ -11,10 +11,10 @@ use crate::logger::{LogType, admin_logger};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Process {
-    pub pname: String,
-    pub pid: String,
-    pub steps: Vec<Job>,
-    pub desc: Option<String>,
+	pub pname: String,
+	pub pid: String,
+	pub steps: Vec<Job>,
+	pub desc: Option<String>,
 	pub roles: Vec<String>,
 }
 
@@ -37,8 +37,8 @@ pub struct ProcessDataResponse {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Job {
-    pub event: String,
-    pub args : Option<Vec<String>>,
+	pub event: String,
+	pub args : Option<Vec<String>>,
 	pub next: Vec<i32>,
 	pub required: Vec<i32>
 }
@@ -57,20 +57,20 @@ static CONFIG_DIR: Lazy<PathBuf> = Lazy::new(|| {
 
 pub fn read_process_data(pid: String) -> Result<Process, std::io::Error> {
 	let data_path = CONFIG_DIR.join(format!("{}.json", pid));
-    let process_data = std::fs::read_to_string(data_path)?;
-    let parsed_data = serde_json::from_str::<Process>(&process_data)?;
+	let process_data = std::fs::read_to_string(data_path)?;
+	let parsed_data = serde_json::from_str::<Process>(&process_data)?;
 
-    return Ok(parsed_data);
+	return Ok(parsed_data);
 }
 
 fn save_process_data(data: &Process) -> Result<(), std::io::Error> {
 	let pid = data.pid.clone();
 
 	let data_path = CONFIG_DIR.join(format!("{}.json", pid));
-    let serialized = serde_json::to_string::<Process>(data).unwrap();
+	let serialized = serde_json::to_string::<Process>(data).unwrap();
 
-    std::fs::write(data_path, serialized)?;
-    return Ok(());
+	std::fs::write(data_path, serialized)?;
+	return Ok(());
 }
 
 pub async fn get_all_processes(
@@ -102,7 +102,7 @@ pub async fn get_all_processes(
 
 pub async fn create_process(
 	extract::State(pool) : extract::State<PgPool>,
-    Json(payload) : Json<Process>,
+	Json(payload) : Json<Process>,
 ) -> Result<StatusCode, StatusCode> {
 	let pid = payload.pid.clone();
 
@@ -124,7 +124,7 @@ pub async fn create_process(
 	}
 	let mut tx = pool.begin().await.unwrap();
 
-    
+	
 
 	let query = sqlx::query("insert into process_defs (process_id, allowed_roles, description) values ($1, $2, $3)")
 		.bind(&payload.pid)
@@ -140,10 +140,10 @@ pub async fn create_process(
 	}
 
 	if let Err(e) = save_process_data(&payload) {
-        admin_logger(&LogType::Error, &format!("Error saving new process data: {}", e), None)
+		admin_logger(&LogType::Error, &format!("Error saving new process data: {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
+	}
 
 	let result = tx.commit().await;
 	if let Err(e) = result {
@@ -155,7 +155,7 @@ pub async fn create_process(
 
 	admin_logger(&LogType::Info, &format!("Process {} created successfully", payload.pid), None)
 		.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    return Ok(StatusCode::CREATED);
+	return Ok(StatusCode::CREATED);
 }
 
 pub async fn get_process_data(
