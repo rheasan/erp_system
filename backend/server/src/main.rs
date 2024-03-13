@@ -17,6 +17,7 @@ pub mod ticket;
 pub mod utils;
 pub mod logger;
 pub mod notif_handler;
+pub mod callbacks;
 
 
 #[tokio::main]
