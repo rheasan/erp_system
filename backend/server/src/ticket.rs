@@ -1,13 +1,13 @@
 use axum::{Json, http::StatusCode, extract};
-use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};
 use sqlx::FromRow;
 use crate::{db_types::Ticket, process::{read_process_data, Process}};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use crate::{utils, logger::{LogType, log, admin_logger}};
 use crate::notif_handler::{Ping, ping_notifier};
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "snake_case")]
 pub enum Event {Initiate, Approve, Notify, Complete}
 #[derive(Debug)]
 pub enum TicketStatus {Open, Closed, Rejected}
@@ -28,15 +28,14 @@ pub struct SingleExecState {
 	pub completable_steps : Vec<i32>,
 }
 #[derive(Debug)]
-pub enum ExecuteErr {InvalidTicket, FailedToExecute, InvalidEvent, FailedToReadProcessData, FailedToLog, FailedToNotify}
+pub enum ExecuteErr {InvalidTicket, FailedToExecute, InvalidEvent, FailedToReadProcessData, FailedToLog, FailedToNotify, FailedToExecuteCallback}
 #[derive(Serialize, Deserialize)]
 pub struct CreateTicket {
 	pub process_id: String,
 	pub owner_id: uuid::Uuid,
 	pub owner_name: String,
 	pub is_public: bool,
-	pub filename: Option<String>,
-	pub file_url: Option<String>
+	pub data: Option<serde_json::Value>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -45,7 +44,7 @@ pub struct UpdateTicket {
 	pub user_id: uuid::Uuid,
 	pub	status: bool,
 	pub node: i32,
-	pub message: Option<String>
+	pub data: Option<serde_json::Value>
 }
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct UserIdQueryRes {
@@ -89,14 +88,6 @@ struct Username {
 	username: String
 }
 
-static EVENT_MAP: Lazy<HashMap<String, Event>> = Lazy::new(|| {
-	let mut map = HashMap::new();
-	map.insert("initiate".to_string(), Event::Initiate);
-	map.insert("approve".to_string(), Event::Approve);
-	map.insert("notify".to_string(), Event::Notify);
-	map.insert("complete".to_string(), Event::Complete);
-	return map;
-});
 
 pub async fn create_ticket(
 	extract::State(pool): extract::State<sqlx::PgPool>,
@@ -115,11 +106,6 @@ pub async fn create_ticket(
 	let mut tx = pool.begin().await.unwrap();
 	let log_id = uuid::Uuid::new_v4();
 
-	if payload.filename.is_some() {
-		let file_name = payload.filename.unwrap();
-		let file_url = payload.file_url.unwrap();
-		log(LogType::Info, format!("File {} added by {}. URL: {}", file_name, payload.owner_name, file_url), log_id)?;
-	}
 
 	let query = sqlx::query("insert into tickets (owner_id, process_id, log_id, is_public, created_at, updated_at, status, complete) values ($1, $2, $3, $4, $5, $6, $7, $8)")
 		.bind(payload.owner_id)
@@ -169,7 +155,8 @@ pub async fn create_ticket(
 	}
 
 	// execute the 1 st node of the ticket (always Event::Initiate)
-	let request = &UpdateTicket { ticket_id: ticket.id, user_id: payload.owner_id, status: true, node: 0, message: None };
+	// TODO: Initiate Step should also be able to execute callbacks
+	let request = &UpdateTicket { ticket_id: ticket.id, user_id: payload.owner_id, status: true, node: 0, data: payload.data };
 
 	let result = update_internal(&mut ticket, request).await;
 	if let Err(e) = result {
@@ -361,7 +348,7 @@ pub async fn update_ticket(
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 		log(LogType::Rejection, 
-			format!("Ticket {} rejected by {}, message: {}", ticket.id, payload.user_id, payload.message.unwrap_or("none".into())),
+			format!("Ticket {} rejected by {}, message: {}", ticket.id, payload.user_id, payload.data.unwrap_or("none".into())),
 			ticket.log_id)?;
 	}
 	else {
@@ -459,12 +446,12 @@ async fn update_internal(ticket: &mut Ticket, request: &UpdateTicket) -> Result<
 	let process_data = process_data.unwrap();
 	// process the first request
 	// TODO: currently exec_user_request will not return any new ticket that has to be added. this may change later
-	let result = execute_user_request(ticket, request.node, request.message.as_ref())?;
+	let result = execute_user_request(ticket, request.node, request.data.as_ref()).await?;
 	node_queue.extend(result.completable_steps.iter());
 
 	// FIXME: cleanup this code
 	while let Some(node) = node_queue.pop_front() {
-		let result = execute_completable(ticket, node, &process_data)?;
+		let result = execute_completable(ticket, node, &process_data).await?;
 		if !result.completable_steps.is_empty() {
 			node_queue.extend(result.completable_steps.iter());
 		}
@@ -476,8 +463,7 @@ async fn update_internal(ticket: &mut Ticket, request: &UpdateTicket) -> Result<
 	return Ok(ticket_queue);
 }
 
-fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<&String>) -> Result<SingleExecState, ExecuteErr>{
-	let process_map = &EVENT_MAP;
+async fn execute_user_request(ticket: &mut Ticket, current_node: i32, data: Option<&serde_json::Value>) -> Result<SingleExecState, ExecuteErr>{
 	let process_data = read_process_data(ticket.process_id.clone());
 	if let Err(e) = process_data {
 		log(LogType::Error, format!("Error reading process data: {}", e), ticket.log_id)
@@ -487,7 +473,20 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<
 
 	let process_data = process_data.unwrap();
 	let current_job = process_data.steps[current_node as usize].clone();
-	let event = process_map.get(&current_job.event).unwrap();
+	let event = current_job.event;
+
+	// execute the callback for the current node
+	let current_callbacks = current_job.callbacks.unwrap_or(vec![]);
+	for callback in current_callbacks {
+		let res = callback.execute(&data).await;
+		if let Err(e) = res {
+			admin_logger(&LogType::FailedToExecuteCallback, 
+				&format!("Failed to execute callback: {}. Error: {}", callback.name(), e), 
+				Some(ticket.log_id).as_ref()	
+			).map_err(|_| ExecuteErr::FailedToLog)?;
+			return Err(ExecuteErr::FailedToExecuteCallback);
+		}
+	}
 
 	let mut result = SingleExecState {
 		status: TicketStatus::Open,
@@ -511,7 +510,7 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<
 			ticket.complete |= 1 << current_node;
 			ticket.update_time();
 			log(LogType::Approval, 
-				format!("Ticket {} approved by {}, message: {}", ticket.id, current_job.args.unwrap()[0], message.unwrap_or(&"none".to_string())),
+				format!("Ticket {} approved by {}", ticket.id, current_job.args.unwrap()[0]),
 				ticket.log_id)
 				.map_err(|_| ExecuteErr::FailedToLog)?;
 		}
@@ -532,7 +531,8 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<
 
 	for step in next_steps {
 		let next_job = process_data.steps[step as usize].clone();
-		if next_job.event == "complete" {
+		
+		if let Event::Complete = next_job.event {
 			if utils::check_n_complete(ticket.complete, process_data.steps.len() as i32) {
 				result.completable_steps.push(step);
 			}
@@ -545,16 +545,27 @@ fn execute_user_request(ticket: &mut Ticket, current_node: i32, message: Option<
 
 	return Ok(result);
 }
-fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process) -> Result<SingleExecState, ExecuteErr>{
-	let process_map = &EVENT_MAP;
+async fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process) -> Result<SingleExecState, ExecuteErr>{
 	let mut result = SingleExecState {
 		status: TicketStatus::Open,
 		completable_steps: Vec::new(),
 		new_ticket: None
 	};
 	let current_job = process.steps[current_node as usize].clone();
-
-	match process_map.get(&current_job.event).unwrap() {
+	// TODO: callbacks with data for completable steps
+	
+	let callbacks = current_job.callbacks.unwrap_or(vec![]);
+	for callback in callbacks {
+		let res = callback.execute(&None).await;
+		if let Err(e) = res {
+			admin_logger(&LogType::FailedToExecuteCallback, 
+				&format!("Failed to execute callback: {}. Error: {}", callback.name(), e), 
+				Some(ticket.log_id).as_ref()	
+			).map_err(|_| ExecuteErr::FailedToLog)?;
+			return Err(ExecuteErr::FailedToExecuteCallback);
+		}
+	}
+	match current_job.event {
 		Event::Initiate => {
 			// initiate event is only executed when the ticket is first created it wont be executed here again
 			return Err(ExecuteErr::InvalidEvent);
@@ -590,7 +601,7 @@ fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &Process
 	let next_steps = current_job.next;
 	for step in next_steps {
 		let next_job = process.steps[step as usize].clone();
-		if next_job.event == "complete" {
+		if let Event::Complete = next_job.event {
 			if utils::check_n_complete(ticket.complete, process.steps.len() as i32) {
 				result.completable_steps.push(step);
 			}
@@ -672,7 +683,7 @@ mod ticket_tests {
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
 			node: 0,
-			message: None
+			data: None
 		};
 
 		let result = update_internal(&mut ticket, &request).await;
@@ -700,7 +711,7 @@ mod ticket_tests {
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
 			node: 1,
-			message: None
+			data: None
 		};
 		// in this case the user request is completing approve event so the entire process should complete
 		let result = update_internal(&mut ticket, &request).await;
@@ -736,7 +747,7 @@ mod ticket_tests {
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
 			node: 0,
-			message: None
+			data: None
 		};
 		// in this case the user request is completing approve event so the entire process should complete
 		let result = update_internal(&mut ticket, &request).await;
@@ -773,7 +784,7 @@ mod ticket_tests {
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
 			node: 0,
-			message: None
+			data: None
 		};
 
 		let result = update_internal(&mut ticket, &request).await;
@@ -812,7 +823,7 @@ mod ticket_tests {
 			user_id: uuid::Uuid::new_v4(),
 			status: true,
 			node: 2,
-			message: None
+			data: None
 		};
 
 		let result = update_internal(&mut ticket, &request).await;

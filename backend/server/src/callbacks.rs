@@ -1,7 +1,12 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
+use once_cell::sync::Lazy;
 
+
+static CALLBACK_DIR: Lazy<PathBuf> = Lazy::new(|| {
+	PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap()).join("scripts")
+});
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type")]
@@ -24,9 +29,9 @@ impl Callback {
 	pub async fn execute(&self, data: &Option<&serde_json::Value>) -> Result<(), String> {
 		match self {
 			Callback::Script { name, path } => {
-				let data_string = &serde_json::to_string(data).unwrap();
+				let data_string = serde_json::to_string(data).unwrap();
 				let result = Command::new("python")
-				.args(&[path, data_string])
+				.args(&[format!("{:?}", CALLBACK_DIR.join(path)), data_string])
 				.output()
 				.await;
 
@@ -48,7 +53,12 @@ impl Callback {
 			}
 		}	
 	}
-	
+	pub fn name(&self) -> &String {
+		match self {
+			Callback::Script { name, .. } => name,
+			Callback::Webhook { name, .. } => name
+		}
+	}
 }
 
 

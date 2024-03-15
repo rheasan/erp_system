@@ -7,13 +7,13 @@ use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};
 use sqlx::{PgPool, FromRow};
 use std::path::PathBuf;
-use crate::logger::{LogType, admin_logger};
+use crate::{callbacks::Callback, logger::{admin_logger, LogType}, ticket};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Process {
 	pub pname: String,
 	pub pid: String,
-	pub steps: Vec<Job>,
+	pub steps: Vec<Step>,
 	pub desc: Option<String>,
 	pub roles: Vec<String>,
 }
@@ -35,12 +35,14 @@ pub struct ProcessDataResponse {
 	pub description: Option<String> 
 }
 
+// TODO: step should probably be an enum
 #[derive(Serialize, Deserialize, Clone)]
-pub struct Job {
-	pub event: String,
+pub struct Step {
+	pub event: ticket::Event,
 	pub args : Option<Vec<String>>,
 	pub next: Vec<i32>,
-	pub required: Vec<i32>
+	pub required: Vec<i32>,
+	pub callbacks: Option<Vec<Callback>>
 }
 
 #[derive(Serialize, Deserialize)]
