@@ -579,6 +579,8 @@ async fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &P
 			});
 		}
 		Event::Notify => {
+			// this step can be completed right now
+			ticket.complete |= 1 << current_node;
 			result.new_ticket = Some(NewUserTicket {
 				type_: NewUserTicketType::Notify,
 				ticket_id: ticket.id,
