@@ -392,7 +392,38 @@ pub async fn update_ticket(
 					log(LogType::Request, format!("Ticket {} approval requested from {}", ticket.id, userid.userid), ticket.log_id)?;
 				}
 				NewUserTicketType::Notify => {
-					todo!("implement notify logic")
+					// insert a new ticket into notifications table and ping the notifier server
+
+					let owner_name_query: Result<Username, _> = sqlx::query_as("select username from users where userid=$1")
+						.bind(ticket.owner_id)
+						.fetch_one(&mut *tx)
+						.await;
+
+					if let Err(e) = owner_name_query {
+						admin_logger(&LogType::Error, &format!("failed to get owner name in notification NewUserTicket. create request from {}. Error: {}", ticket.owner_id, e), None)
+							.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
+						return Err(StatusCode::INTERNAL_SERVER_ERROR);
+					}
+					let message = format!("Ticket created by {}. Process Id: {}", ticket.owner_id, ticket.process_id);
+
+					let notified_username = new_ticket.username.as_ref().unwrap();
+
+					// add notification
+					let query = sqlx::query("insert into notifications (userid, message, created_at) values ((select userid from users where username=$1), $2, $3)")
+						.bind(notified_username)
+						.bind(message)
+						.bind(chrono::Utc::now())
+						.execute(&mut *tx)
+						.await;
+
+					if let Err(e) = query {
+						admin_logger(&LogType::Error, &format!("failed to add notification in NewUserTicket. create request from {}, Error: {}", ticket.owner_id, e), None)
+							.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
+						return Err(StatusCode::INTERNAL_SERVER_ERROR);
+					}
+					
+					log(LogType::NotificationSuccess, format!("Notification sent to notifier for user {} notified for ticket {}", notified_username, ticket.id), ticket.log_id)
+						.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 				}
 				NewUserTicketType::Completion => {
 					// this ticket is always the last in the new_ticket_queue because it requires all other nodes to be executed first
