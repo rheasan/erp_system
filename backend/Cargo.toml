@@ -1,5 +1,5 @@
 [workspace]
-members = ["server", "notifier"]
+members = ["server", "notifier", "callbacks"]
 resolver = "2"
 
 [workspace.dependencies]

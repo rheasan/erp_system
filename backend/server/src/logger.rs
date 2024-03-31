@@ -14,7 +14,7 @@ pub enum LogType {
 	Error,
 	Completion,
 	FailedToPing,
-	FailedToExecuteCallback
+	FailedToSendTask
 }
 
 fn public_logger(type_: &LogType, data: &String, log_id: &uuid::Uuid) -> Result<(), std::io::Error>  {
@@ -34,7 +34,7 @@ fn public_logger(type_: &LogType, data: &String, log_id: &uuid::Uuid) -> Result<
 		LogType::Completion => "COMPLETION",
 		LogType::Info => "INFO",
 		LogType::NotificationSuccess => "NOTIFICATION_SUCCESS",
-		LogType::FailedToExecuteCallback => "FAILED_TO_EXECUTE_CALLBACK",
+		LogType::FailedToSendTask => "FAILED_TO_SEND_TASK",
 		_ => unreachable!()
 	};
 
@@ -74,7 +74,7 @@ pub fn admin_logger(type_: &LogType, data: &String, log_id: Option<&uuid::Uuid>)
 		LogType::Completion => "COMPLETION",
 		LogType::FailedToPing => "FAILED_TO_PING",
 		LogType::NotificationSuccess => "NOTIFICATION_SUCCESS",
-		LogType::FailedToExecuteCallback => "FAILED_TO_EXECUTE_CALLBACK",
+		LogType::FailedToSendTask => "FAILED_TO_SEND_TASK",
 	};
 
 	let log = format!("[{}] [{}] {}\n", log_type, chrono::Local::now().to_rfc3339(), data);
@@ -86,7 +86,7 @@ pub fn admin_logger(type_: &LogType, data: &String, log_id: Option<&uuid::Uuid>)
 pub fn log(type_: LogType, data: String, log_id: uuid::Uuid) -> Result<(), StatusCode> {
 	match type_ {
 		LogType::Approval | LogType::Rejection | LogType::UploadSuccess | LogType::Request | 
-		LogType::Completion | LogType::Info | LogType::NotificationSuccess | LogType::FailedToExecuteCallback => {
+		LogType::Completion | LogType::Info | LogType::NotificationSuccess | LogType::FailedToSendTask => {
 			public_logger(&type_, &data, &log_id).map_err(|e| {
 				eprintln!("Unable to write to log file: {}, log_id: {}", e, log_id);
 				return StatusCode::INTERNAL_SERVER_ERROR;

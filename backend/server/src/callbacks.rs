@@ -1,11 +1,17 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, net::SocketAddr};
 use serde::{Deserialize, Serialize};
-use tokio::process::Command;
+use tokio::net::TcpStream;
 use once_cell::sync::Lazy;
+use tokio::io::AsyncWriteExt;
+use crate::{logger::{admin_logger, LogType}, ticket::ExecuteErr};
 
 
-static CALLBACK_DIR: Lazy<PathBuf> = Lazy::new(|| {
-	PathBuf::from(std::env::var("PROCESS_DATA_PATH").unwrap()).join("scripts")
+
+
+static CALLBACK_ADDR : Lazy<SocketAddr> = Lazy::new(|| {
+	let callback_port = std::env::var("CALLBACK_SERVER_PORT").unwrap()
+		.parse::<u16>().unwrap();
+	SocketAddr::from(([127, 0, 0, 1], callback_port))
 });
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -23,42 +29,47 @@ pub enum Callback {
 		headers: HashMap<String, String>
 	}
 }
-
-impl Callback {
-	// FIXME: taking serde_json::Value instead of proper type per callback is not very safe
-	pub async fn execute(&self, data: &Option<&serde_json::Value>) -> Result<(), String> {
-		match self {
-			Callback::Script { name, path } => {
-				let data_string = serde_json::to_string(data).unwrap();
-				let result = Command::new("python")
-				.args(&[format!("{:?}", CALLBACK_DIR.join(path)), data_string])
-				.output()
-				.await;
-
-				if let Err(e) = result {
-					return Err(format!("Callback {name} failed to run. Error: {e}"));
-				}
-				let result = result.unwrap();
-
-				if result.status.success() {
-					let err_msg = String::from_utf8(result.stderr).unwrap();
-					let exit_code = result.status.code().unwrap();
-					return Err(format!("Callback {} exited with code: {}, stderr: {}", name, exit_code, err_msg));
-				}
-
-				return Ok(());
-			}
-			Callback::Webhook { name: _, url: _, headers: _ } => {
-				todo!("impl webhooks")
-			}
-		}	
-	}
-	pub fn name(&self) -> &String {
-		match self {
-			Callback::Script { name, .. } => name,
-			Callback::Webhook { name, .. } => name
-		}
-	}
+pub enum SignalType {
+	SendTask, // 1u64
+	RegisterCallback // 2u64
 }
+
+pub async fn send_task(data: &Option<&serde_json::Value>, callbacks: &Vec<Callback>) -> Result<(), ExecuteErr> {
+	let header_bytes = 1u64.to_le_bytes();
+
+	let conn = TcpStream::connect(*CALLBACK_ADDR).await;
+	if let Err(e) = conn {
+		admin_logger(&LogType::FailedToPing, &format!("Failed to ping callback server. e: {}", e), None)
+			.map_err(|_e| ExecuteErr::FailedToLog)?;
+		return Err(ExecuteErr::FailedToNotify);
+	}
+
+	let mut conn = conn.unwrap();
+	let res = conn.write(&header_bytes).await;
+	
+	if let Err(e) = res {
+		admin_logger(&LogType::FailedToPing, &format!("Failed to send header to callback server. e: {}", e), None)
+			.map_err(|_e| ExecuteErr::FailedToLog)?;
+		return Err(ExecuteErr::FailedToNotify);
+	}	
+
+
+	let serialized_data = serde_json::to_string(&data.unwrap_or(&serde_json::Value::default())).unwrap();
+	let serialized_callbacks = serde_json::to_string(callbacks).unwrap();
+	
+	// FIXME: : The connection might break at this stage...
+	
+	// send data for the callbacks
+	let _ = conn.write(&(serialized_data.len() as u64).to_le_bytes()).await;
+	let _ = conn.write(&serialized_data.as_bytes()).await;
+	
+	// send callbacks
+	let _ = conn.write(&(serialized_callbacks.len() as u64).to_le_bytes()).await;
+	let _ = conn.write(&serialized_callbacks.as_bytes()).await;
+
+	Ok(())
+}
+
+
 
 

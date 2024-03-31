@@ -1,0 +1,12 @@
+[package]
+name = "callbacks"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = { workspace = true, features = ["serde"] }
+once_cell.workspace = true
+tokio = { workspace = true, features = ["full"] }
+dotenv.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

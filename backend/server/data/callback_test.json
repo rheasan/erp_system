@@ -10,9 +10,14 @@
       "callbacks":[
         {
           "type":"script",
-          "name":"test_callback",
+          "name":"test_callback_python",
           "path":"script.py"
-        }
+        },
+		{
+			"type":"script",
+			"name":"test_callback_js",
+			"path":"script.js"
+		}
       ]
     },
     {

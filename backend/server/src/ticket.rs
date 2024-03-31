@@ -1,7 +1,7 @@
 use axum::{Json, http::StatusCode, extract};
 use serde::{Serialize, Deserialize};
 use sqlx::FromRow;
-use crate::{db_types::Ticket, process::{read_process_data, Process}};
+use crate::{callbacks::send_task, db_types::Ticket, process::{read_process_data, Process}};
 use std::collections::VecDeque;
 use crate::{utils, logger::{LogType, log, admin_logger}};
 use crate::notif_handler::{Ping, ping_notifier};
@@ -508,15 +508,8 @@ async fn execute_user_request(ticket: &mut Ticket, current_node: i32, data: Opti
 
 	// execute the callback for the current node
 	let current_callbacks = current_job.callbacks.unwrap_or(vec![]);
-	for callback in current_callbacks {
-		let res = callback.execute(&data).await;
-		if let Err(e) = res {
-			admin_logger(&LogType::FailedToExecuteCallback, 
-				&format!("Failed to execute callback: {}. Error: {}", callback.name(), e), 
-				Some(ticket.log_id).as_ref()	
-			).map_err(|_| ExecuteErr::FailedToLog)?;
-			return Err(ExecuteErr::FailedToExecuteCallback);
-		}
+	if !current_callbacks.is_empty(){
+		send_task(&data, &current_callbacks).await?;
 	}
 
 	let mut result = SingleExecState {
@@ -586,15 +579,8 @@ async fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &P
 	// TODO: callbacks with data for completable steps
 	
 	let callbacks = current_job.callbacks.unwrap_or(vec![]);
-	for callback in callbacks {
-		let res = callback.execute(&None).await;
-		if let Err(e) = res {
-			admin_logger(&LogType::FailedToExecuteCallback, 
-				&format!("Failed to execute callback: {}. Error: {}", callback.name(), e), 
-				Some(ticket.log_id).as_ref()	
-			).map_err(|_| ExecuteErr::FailedToLog)?;
-			return Err(ExecuteErr::FailedToExecuteCallback);
-		}
+	if !callbacks.is_empty() {
+		send_task(&None, &callbacks).await?;
 	}
 	match current_job.event {
 		Event::Initiate => {
