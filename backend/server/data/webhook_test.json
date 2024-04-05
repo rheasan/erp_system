@@ -1,0 +1,32 @@
+{
+  "pname": "webhook_test",
+  "pid": "webhook_test",
+  "steps": [
+    {
+      "event": "initiate",
+      "args": null,
+      "next": [1],
+      "required": [],
+      "callbacks": [
+        {
+          "type": "webhook",
+          "name": "test_webhook",
+          "url": "http://127.0.0.1:5005/",
+          "headers": {
+            "x-callback-id": "test_webhook",
+            "x-callback-name": "test_webhook"
+          }
+        }
+      ]
+    },
+    {
+      "event": "complete",
+      "args": null,
+      "next": [],
+      "required": [0],
+      "callbacks": null
+    }
+  ],
+  "desc": null,
+  "roles": ["any"]
+}

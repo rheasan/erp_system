@@ -1,6 +1,7 @@
 use std::{collections::{HashMap, VecDeque}, io::ErrorKind, net::SocketAddr, time::Duration};
 use chrono::Local;
 use once_cell::sync::Lazy;
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncReadExt, net::{TcpListener, TcpStream}, process::Command, sync::Mutex, time::sleep};
 
@@ -24,7 +25,7 @@ pub enum Callback {
 }
 #[derive(Debug)]
 pub struct Task {
-	data: String,
+	data: serde_json::Value,
 	callbacks: Vec<Callback>
 }
 
@@ -101,11 +102,12 @@ async fn handle_ping(mut stream: TcpStream, addr: SocketAddr) {
 
 
 		let data = String::from_utf8(data_buffer).unwrap();
+		let deserialized : serde_json::Value = serde_json::from_str(&data).unwrap();
 		let callbacks: Vec<Callback> = serde_json::from_slice(&callback_buffer).unwrap();
 
 		{
 			let mut guard = TASK_QUEUE.lock().await;
-			guard.push_back(Task { data, callbacks });
+			guard.push_back(Task { data: deserialized, callbacks });
 		}
 	}
 	// RegisterCallback == 2u64
@@ -116,7 +118,7 @@ async fn handle_ping(mut stream: TcpStream, addr: SocketAddr) {
 
 
 impl Callback {
-	pub async fn execute(&self, data: &String) -> Result<(), std::io::Error> {
+	pub async fn execute(&self, data: &serde_json::Value) -> Result<(), std::io::Error> {
 		match self {
 			Callback::Script {name, path} => {
 				println!("[INFO] [{}] Executing callback: {}", Local::now(), name);
@@ -127,10 +129,11 @@ impl Callback {
 					true => "python",
 					false => "node"
 				};
+				let serialized = serde_json::to_string(data).unwrap();
 
 				let result = Command::new(prgm)
 					.current_dir(script_base_path)
-					.args([&path, data])
+					.args([path, &serialized])
 					.output()
 					.await?;
 
@@ -148,8 +151,23 @@ impl Callback {
 
 				return Ok(());
 			}
-			Callback::Webhook { .. } => {
-				todo!("Implement Webhook logic");
+			Callback::Webhook { name, url, headers } => {
+				let mut client = reqwest::Client::new().request(Method::POST, url);
+				// prepare headers
+				for (header_name, header_val) in headers {
+					client = client.header(header_name, header_val);
+				}
+				let res = client.json(data)
+				.send()
+				.await;
+				
+				if let Err(e) = res {
+					return Err(std::io::Error::new(ErrorKind::Other, e));
+				}
+
+				let res = res.unwrap();
+				println!("[INFO] [{}] Webhook {} returned StatusCode: {}, text: {:?}", Local::now(), name, res.status(), res.text().await);
+				return Ok(())
 			}
 		}
 	}

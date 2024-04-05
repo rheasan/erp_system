@@ -5,3 +5,5 @@ target
 .env
 admin_logs
 public_logs
+socket_test
+webhook_test
