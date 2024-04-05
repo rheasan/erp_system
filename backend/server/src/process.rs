@@ -45,6 +45,15 @@ pub struct Step {
 	pub callbacks: Option<Vec<Callback>>
 }
 
+impl Step {
+	pub fn is_not_approve(&self) -> bool {
+		match self.event {
+			ticket::Event::Approve => false,
+			_ => true
+		}
+	}
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct UserName {
 	pub username: String

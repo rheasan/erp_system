@@ -577,11 +577,15 @@ async fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &P
 	};
 	let current_job = process.steps[current_node as usize].clone();
 	// TODO: callbacks with data for completable steps
+	// Approve node reached at this stage is not "completed". we only add a NewUserTicket at this stage so
+	// callbacks should only be executed when the node is reached from execute_user_request
+	if current_job.is_not_approve() {
+		let callbacks = current_job.callbacks.unwrap_or(vec![]);
+		if !callbacks.is_empty() {
+			send_task(&None, &callbacks).await?;
+		}
+	}	
 	
-	let callbacks = current_job.callbacks.unwrap_or(vec![]);
-	if !callbacks.is_empty() {
-		send_task(&None, &callbacks).await?;
-	}
 	match current_job.event {
 		Event::Initiate => {
 			// initiate event is only executed when the ticket is first created it wont be executed here again
