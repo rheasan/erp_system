@@ -1,5 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr};
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, Map};
 use tokio::net::TcpStream;
 use once_cell::sync::Lazy;
 use tokio::io::AsyncWriteExt;
@@ -54,7 +55,8 @@ pub async fn send_task(data: &Option<&serde_json::Value>, callbacks: &Vec<Callba
 	}	
 
 
-	let serialized_data = serde_json::to_string(&data.unwrap_or(&serde_json::Value::default())).unwrap();
+	// None should be serialized to "{}" instead of "null" because if the callback is a webhook then body should be empty object not null 
+	let serialized_data = serde_json::to_string(&data.unwrap_or(&Value::Object(Map::new()))).unwrap();
 	let serialized_callbacks = serde_json::to_string(callbacks).unwrap();
 	
 	// FIXME: : The connection might break at this stage...
