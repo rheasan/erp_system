@@ -509,7 +509,13 @@ async fn execute_user_request(ticket: &mut Ticket, current_node: i32, data: Opti
 	// execute the callback for the current node
 	let current_callbacks = current_job.callbacks.unwrap_or(vec![]);
 	if !current_callbacks.is_empty(){
-		send_task(&data, &current_callbacks).await?;
+		let data = match data {
+			Some(d) => Some(d.to_owned()),
+			None => None
+		};
+		tokio::spawn(async move {
+			send_task(&data, &current_callbacks).await;
+		});
 	}
 
 	let mut result = SingleExecState {
@@ -582,7 +588,9 @@ async fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &P
 	if current_job.is_not_approve() {
 		let callbacks = current_job.callbacks.unwrap_or(vec![]);
 		if !callbacks.is_empty() {
-			send_task(&None, &callbacks).await?;
+			tokio::spawn(async move {
+				send_task(&None, &callbacks).await;
+			});
 		}
 	}	
 	

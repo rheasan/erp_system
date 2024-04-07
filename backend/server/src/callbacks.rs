@@ -35,28 +35,27 @@ pub enum SignalType {
 	RegisterCallback // 2u64
 }
 
-pub async fn send_task(data: &Option<&serde_json::Value>, callbacks: &Vec<Callback>) -> Result<(), ExecuteErr> {
+pub async fn send_task(data: &Option<serde_json::Value>, callbacks: &Vec<Callback>) {
 	let header_bytes = 1u64.to_le_bytes();
 
 	let conn = TcpStream::connect(*CALLBACK_ADDR).await;
-	if let Err(e) = conn {
-		admin_logger(&LogType::FailedToPing, &format!("Failed to ping callback server. e: {}", e), None)
-			.map_err(|_e| ExecuteErr::FailedToLog)?;
-		return Err(ExecuteErr::FailedToNotify);
+	if let Err(ref e) = conn {
+		let _ = admin_logger(&LogType::FailedToPing, &format!("Failed to ping callback server. e: {}", e), None)
+			.map_err(|_e| ExecuteErr::FailedToLog);
 	}
 
 	let mut conn = conn.unwrap();
 	let res = conn.write(&header_bytes).await;
 	
-	if let Err(e) = res {
-		admin_logger(&LogType::FailedToPing, &format!("Failed to send header to callback server. e: {}", e), None)
-			.map_err(|_e| ExecuteErr::FailedToLog)?;
-		return Err(ExecuteErr::FailedToNotify);
+	if let Err(ref e) = res {
+		let _ = admin_logger(&LogType::FailedToPing, &format!("Failed to send header to callback server. e: {}", e), None)
+			.map_err(|_e| ExecuteErr::FailedToLog);
 	}	
 
 
 	// None should be serialized to "{}" instead of "null" because if the callback is a webhook then body should be empty object not null 
-	let serialized_data = serde_json::to_string(&data.unwrap_or(&Value::Object(Map::new()))).unwrap();
+	let data = data.clone().unwrap_or(Value::Object(Map::new()));
+	let serialized_data = serde_json::to_string(&data).unwrap();
 	let serialized_callbacks = serde_json::to_string(callbacks).unwrap();
 	
 	// FIXME: : The connection might break at this stage...
@@ -69,7 +68,6 @@ pub async fn send_task(data: &Option<&serde_json::Value>, callbacks: &Vec<Callba
 	let _ = conn.write(&(serialized_callbacks.len() as u64).to_le_bytes()).await;
 	let _ = conn.write(&serialized_callbacks.as_bytes()).await;
 
-	Ok(())
 }
 
 
