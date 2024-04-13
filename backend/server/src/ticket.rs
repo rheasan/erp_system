@@ -8,7 +8,7 @@ use crate::notif_handler::{Ping, ping_notifier};
 
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum Event {Initiate, Approve, Notify, Complete}
+pub enum Event {Initiate, Approve, Notify, NonBlockingTask, BlockingTask, Complete}
 #[derive(Debug)]
 pub enum TicketStatus {Open, Closed, Rejected}
 
@@ -285,7 +285,7 @@ pub async fn update_ticket(
 	/*
 		INFO: user always receives the ticket from user_active_tickets unless they are the owner of the specific ticket
 		1. Set the status of the ticket in user_active_tickets to false.
-		2. If the user rejected the ticket (only possible in Event::Approve) then set the status of the ticket in tickets table to rejected
+		2. If the user rejected the ticket (only possible in Event::Approve or Event::BlockingTask) then set the status of the ticket in tickets table to rejected
 			and set the status of all tickets with the same ticket_id to false.
 		3. If the user accepted the ticket then fetch the complete ticket from tickets table and call update_internal
 		4. Add all tickets returned by update_internal
@@ -504,19 +504,24 @@ async fn execute_user_request(ticket: &mut Ticket, current_node: i32, data: Opti
 
 	let process_data = process_data.unwrap();
 	let current_job = process_data.steps[current_node as usize].clone();
-	let event = current_job.event;
 
 	// execute the callback for the current node
-	let current_callbacks = current_job.callbacks.unwrap_or(vec![]);
-	if !current_callbacks.is_empty(){
-		let data = match data {
-			Some(d) => Some(d.to_owned()),
-			None => None
-		};
-		tokio::spawn(async move {
-			send_task(&data, &current_callbacks).await;
-		});
+	// if the current step is a BlockingTask then the callbacks have already been completed,
+	// this request comes from callback server
+	if current_job.is_not_blocking_task() {
+		let current_callbacks = current_job.callbacks.unwrap_or(vec![]);
+		if !current_callbacks.is_empty() {
+			let data = match data {
+				Some(d) => Some(d.to_owned()),
+				None => None
+			};
+			tokio::spawn(async move {
+				send_task(&data, &current_callbacks).await;
+			});
+		}
 	}
+	
+	let event = current_job.event;
 
 	let mut result = SingleExecState {
 		status: TicketStatus::Open,
@@ -556,6 +561,21 @@ async fn execute_user_request(ticket: &mut Ticket, current_node: i32, data: Opti
 			log(LogType::Error, format!("Attempt to complete ticket {} from {}", ticket.id, current_job.args.unwrap()[0]), ticket.log_id)
 				.map_err(|_| ExecuteErr::FailedToLog)?;
 			return Err(ExecuteErr::InvalidTicket);
+		},
+		Event::NonBlockingTask => {
+			// Same as Event::Notify. cannot be reached through user request
+			log(LogType::Error, format!("Attempt to execute NonBlockingTask node ticket {} from {}", ticket.id, current_job.args.unwrap()[0]), ticket.log_id)
+				.map_err(|_| ExecuteErr::FailedToLog)?;
+			return Err(ExecuteErr::InvalidTicket);
+		},
+		Event::BlockingTask => {
+			// This node is only reachable from callbacks
+			ticket.complete |= 1 << current_node;
+			ticket.update_time();
+			log(LogType::Approval, 
+				format!("Ticket {} approved from callback", ticket.id),
+				ticket.log_id)
+				.map_err(|_| ExecuteErr::FailedToLog)?;
 		}
 	}
 
@@ -627,7 +647,15 @@ async fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &P
 			});
 
 			return Ok(result);
+		},
+		Event::NonBlockingTask => {
+			ticket.update_time();
+			ticket.complete |= 1 << current_node;
 		}
+		Event::BlockingTask => {
+			// Do nothing. callbacks are already sent so just wait for them to move this node forward
+			ticket.update_time();
+		},
 	}
 	let next_steps = current_job.next;
 	for step in next_steps {

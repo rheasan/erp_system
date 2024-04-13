@@ -1,0 +1,31 @@
+{
+  "pname": "nonblocking_task_test",
+  "pid": "nonblocking_task_test",
+  "steps": [
+    {
+      "event": "initiate",
+      "args": null,
+      "next": [1],
+      "required": [],
+      "callbacks": null
+    },
+    {
+      "event": "non_blocking_task",
+      "args": null,
+      "next": [2],
+      "required": [],
+      "callbacks": [
+        { "type": "script", "name": "test_callback", "path": "./script.js" }
+      ]
+    },
+    {
+      "event": "complete",
+      "args": null,
+      "next": [],
+      "required": [1],
+      "callbacks": null
+    }
+  ],
+  "desc": null,
+  "roles": ["any"]
+}

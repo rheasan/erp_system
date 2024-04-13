@@ -1,0 +1,31 @@
+{
+  "pname": "blocking_task_branch_test",
+  "pid": "blocking_task_branch_test",
+  "steps": [
+    {
+      "event": "initiate",
+      "args": null,
+      "next": [1, 2],
+      "required": [],
+      "callbacks": null
+    },
+    { "event": "notify", "args": ["erp_admin"], "next": [3], "required": [0] },
+    { "event": "notify", "args": ["erp_admin"], "next": [3], "required": [0] },
+    {
+      "event": "blocking_task",
+      "args": null,
+      "next": [4],
+      "required": [1, 2],
+      "callbacks": null
+    },
+	{
+      "event": "complete",
+      "args": null,
+      "next": [4],
+      "required": [1, 2],
+      "callbacks": null
+    }
+  ],
+  "desc": null,
+  "roles": ["any"]
+}

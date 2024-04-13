@@ -52,6 +52,12 @@ impl Step {
 			_ => true
 		}
 	}
+	pub fn is_not_blocking_task(&self) -> bool {
+		match self.event {
+			ticket::Event::BlockingTask => false,
+			_ => true
+		}
+	}
 }
 
 #[derive(Serialize, Deserialize)]
