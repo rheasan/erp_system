@@ -34,6 +34,7 @@ pub struct Ticket {
 	pub updated_at: chrono::DateTime<chrono::Utc>,
 	pub status: String,
 	pub complete: i32,
+	pub state: serde_json::Value
 }
 
 impl Ticket {

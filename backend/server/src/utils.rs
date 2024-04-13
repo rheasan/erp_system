@@ -1,3 +1,13 @@
+use serde::Serialize;
+use serde_json::{Map, Value};
+
+#[derive(Serialize)]
+pub struct TaskPayload<'a> {
+	ticket_id: i32,
+	node: i32,
+	cur_node_payload: &'a Option<Map<String, Value>>
+}
+
 pub fn check_required_complete(complete_mask: i32, required_steps: &Vec<i32>) -> bool {
 	let mut required_complete = true;
 	for step in required_steps {
@@ -17,6 +27,14 @@ pub fn check_n_complete(complete_mask: i32, num_nodes: i32) -> bool {
 pub fn gen_random_token() -> String {
 	// TODO: maybe use something else
 	return uuid::Uuid::new_v4().to_string();
+}
+
+pub fn make_task_payload(ticket_id: i32, node: i32, data: &Option<Map<String, Value>>) -> String {
+	return serde_json::to_string(&TaskPayload {
+		ticket_id,
+		node,
+		cur_node_payload: data,
+	}).unwrap();
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 use axum::{Json, http::StatusCode, extract};
 use serde::{Serialize, Deserialize};
+use serde_json::Map;
 use sqlx::FromRow;
 use crate::{callbacks::send_task, db_types::Ticket, process::{read_process_data, Process}};
 use std::collections::VecDeque;
@@ -35,7 +36,7 @@ pub struct CreateTicket {
 	pub owner_id: uuid::Uuid,
 	pub owner_name: String,
 	pub is_public: bool,
-	pub data: Option<serde_json::Value>
+	pub data: Option<Map<String, serde_json::Value>>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -44,7 +45,7 @@ pub struct UpdateTicket {
 	pub user_id: uuid::Uuid,
 	pub	status: bool,
 	pub node: i32,
-	pub data: Option<serde_json::Value>
+	pub data: Option<Map<String, serde_json::Value>>
 }
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct UserIdQueryRes {
@@ -105,9 +106,10 @@ pub async fn create_ticket(
 
 	let mut tx = pool.begin().await.unwrap();
 	let log_id = uuid::Uuid::new_v4();
+	let state = payload.data.clone().unwrap_or_default();
 
 
-	let query = sqlx::query("insert into tickets (owner_id, process_id, log_id, is_public, created_at, updated_at, status, complete) values ($1, $2, $3, $4, $5, $6, $7, $8)")
+	let query = sqlx::query("insert into tickets (owner_id, process_id, log_id, is_public, created_at, updated_at, status, complete, state) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
 		.bind(payload.owner_id)
 		.bind(&payload.process_id)
 		.bind(log_id)
@@ -117,6 +119,7 @@ pub async fn create_ticket(
 		.bind("open")
 		// no nodes have been completed at this stage
 		.bind(0i32)
+		.bind(serde_json::Value::Object(state))
 		.execute(&mut *tx)
 		.await;
 
@@ -348,12 +351,20 @@ pub async fn update_ticket(
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 		log(LogType::Rejection, 
-			format!("Ticket {} rejected by {}, message: {}", ticket.id, payload.user_id, payload.data.unwrap_or("none".into())),
+			format!("Ticket {} rejected by {}, message: {:?}", ticket.id, payload.user_id, payload.data),
 			ticket.log_id)?;
 	}
 	else {
 		// user accepted the ticket
-
+		// update the state
+		match payload.data.clone() {
+			Some(mut data) => {
+				let mut new_state = serde_json::value::from_value::<Map<String, serde_json::Value>>(ticket.state).unwrap();
+				new_state.append(&mut data);
+				ticket.state = serde_json::Value::Object(new_state);
+			}
+			None => {}
+		}
 		// process the update
 		let result = update_internal(&mut ticket, &payload).await;
 		if let Err(e) = result {
@@ -442,10 +453,13 @@ pub async fn update_ticket(
 		}
 
 		// update all fields of the ticket
-		let query = sqlx::query("update tickets set status=$1, complete=$2, updated_at=$3 where id=$4")
+		// TODO: there may be a better way of doing this, serializing multiple times here i think.
+		let final_state = serde_json::value::from_value::<Map<String, serde_json::Value>>(ticket.state).unwrap();
+		let query = sqlx::query("update tickets set status=$1, complete=$2, updated_at=$3, state=$4 where id=$5")
 			.bind(&ticket.status)
 			.bind(ticket.complete)
 			.bind(ticket.updated_at)
+			.bind(&serde_json::Value::Object(final_state))
 			.bind(ticket_id)
 			.execute(&mut *tx)
 			.await;
@@ -494,7 +508,7 @@ async fn update_internal(ticket: &mut Ticket, request: &UpdateTicket) -> Result<
 	return Ok(ticket_queue);
 }
 
-async fn execute_user_request(ticket: &mut Ticket, current_node: i32, data: Option<&serde_json::Value>) -> Result<SingleExecState, ExecuteErr>{
+async fn execute_user_request(ticket: &mut Ticket, current_node: i32, data: Option<&Map<String, serde_json::Value>>) -> Result<SingleExecState, ExecuteErr>{
 	let process_data = read_process_data(ticket.process_id.clone());
 	if let Err(e) = process_data {
 		log(LogType::Error, format!("Error reading process data: {}", e), ticket.log_id)
@@ -511,12 +525,13 @@ async fn execute_user_request(ticket: &mut Ticket, current_node: i32, data: Opti
 	if current_job.is_not_blocking_task() {
 		let current_callbacks = current_job.callbacks.unwrap_or(vec![]);
 		if !current_callbacks.is_empty() {
+			let ticket_id = ticket.id;
 			let data = match data {
-				Some(d) => Some(d.to_owned()),
+				Some(d) => Some(d.clone()),
 				None => None
 			};
 			tokio::spawn(async move {
-				send_task(&data, &current_callbacks).await;
+				send_task(ticket_id, current_node,&data, &current_callbacks).await;
 			});
 		}
 	}
@@ -608,8 +623,9 @@ async fn execute_completable(ticket: &mut Ticket, current_node: i32, process: &P
 	if current_job.is_not_approve() {
 		let callbacks = current_job.callbacks.unwrap_or(vec![]);
 		if !callbacks.is_empty() {
+			let ticket_id = ticket.id;
 			tokio::spawn(async move {
-				send_task(&None, &callbacks).await;
+				send_task(ticket_id, current_node,&None, &callbacks).await;
 			});
 		}
 	}	
@@ -720,6 +736,7 @@ pub async fn get_user_tickets(
 mod ticket_tests {
 	use crate::db_types::Ticket;
 	use dotenv;
+use serde_json::Map;
 
 	use super::{update_internal, NewUserTicketType};
 
@@ -735,7 +752,8 @@ mod ticket_tests {
 			created_at: chrono::Utc::now(),
 			updated_at: chrono::Utc::now(),
 			status: "open".to_string(),
-			complete: 0
+			complete: 0,
+			state: serde_json::Value::Object(Map::new())
 		};
 		let request = crate::ticket::UpdateTicket {
 			ticket_id: 0,
@@ -763,7 +781,8 @@ mod ticket_tests {
 			updated_at: chrono::Utc::now(),
 			status: "open".to_string(),
 			// initiate step is already completed
-			complete: 1
+			complete: 1,
+			state: serde_json::Value::Object(Map::new())
 		};
 		let request = crate::ticket::UpdateTicket {
 			ticket_id: 0,
@@ -799,7 +818,8 @@ mod ticket_tests {
 			created_at: chrono::Utc::now(),
 			updated_at: chrono::Utc::now(),
 			status: "open".to_string(),
-			complete: 0
+			complete: 0,
+			state: serde_json::Value::Object(Map::new())
 		};
 		let request = crate::ticket::UpdateTicket {
 			ticket_id: 0,
@@ -836,7 +856,8 @@ mod ticket_tests {
 			created_at: chrono::Utc::now(),
 			updated_at: chrono::Utc::now(),
 			status: "open".to_string(),
-			complete: 0
+			complete: 0,
+			state: serde_json::Value::Object(Map::new())
 		};
 		let request = crate::ticket::UpdateTicket {
 			ticket_id: 0,
@@ -875,7 +896,8 @@ mod ticket_tests {
 			created_at: chrono::Utc::now(),
 			updated_at: chrono::Utc::now(),
 			status: "open".to_string(),
-			complete: 3i32
+			complete: 3i32,
+			state: serde_json::Value::Object(Map::new())
 		};
 		let request = crate::ticket::UpdateTicket {
 			ticket_id: 0,

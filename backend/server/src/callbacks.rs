@@ -1,10 +1,10 @@
 use std::{collections::HashMap, net::SocketAddr};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, Map};
+use serde_json::{Map, Value};
 use tokio::net::TcpStream;
 use once_cell::sync::Lazy;
 use tokio::io::AsyncWriteExt;
-use crate::{logger::{admin_logger, LogType}, ticket::ExecuteErr};
+use crate::{logger::{admin_logger, LogType}, ticket::ExecuteErr, utils::make_task_payload};
 
 
 
@@ -35,7 +35,7 @@ pub enum SignalType {
 	RegisterCallback // 2u64
 }
 
-pub async fn send_task(data: &Option<serde_json::Value>, callbacks: &Vec<Callback>) {
+pub async fn send_task(ticket_id: i32, cur_node: i32, payload: &Option<Map<String, Value>>, callbacks: &Vec<Callback>) {
 	let header_bytes = 1u64.to_le_bytes();
 
 	let conn = TcpStream::connect(*CALLBACK_ADDR).await;
@@ -53,16 +53,14 @@ pub async fn send_task(data: &Option<serde_json::Value>, callbacks: &Vec<Callbac
 	}	
 
 
-	// None should be serialized to "{}" instead of "null" because if the callback is a webhook then body should be empty object not null 
-	let data = data.clone().unwrap_or(Value::Object(Map::new()));
-	let serialized_data = serde_json::to_string(&data).unwrap();
 	let serialized_callbacks = serde_json::to_string(callbacks).unwrap();
+	let task_payload = make_task_payload(ticket_id, cur_node, payload);
 	
 	// FIXME: : The connection might break at this stage...
 	
 	// send data for the callbacks
-	let _ = conn.write(&(serialized_data.len() as u64).to_le_bytes()).await;
-	let _ = conn.write(&serialized_data.as_bytes()).await;
+	let _ = conn.write(&(task_payload.len() as u64).to_le_bytes()).await;
+	let _ = conn.write(&task_payload.as_bytes()).await;
 	
 	// send callbacks
 	let _ = conn.write(&(serialized_callbacks.len() as u64).to_le_bytes()).await;
