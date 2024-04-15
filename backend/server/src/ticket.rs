@@ -205,7 +205,7 @@ pub async fn create_ticket(
 					.await;
 
 				if let Err(e) = owner_name_query {
-					admin_logger(&LogType::Error, &format!("failed to get owner name in notification NewUserTicket. create request from {}. Error: {}", ticket.owner_id, e), None)
+					admin_logger(LogType::Error, &format!("failed to get owner name in notification NewUserTicket. create request from {}. Error: {}", ticket.owner_id, e), None)
 						.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 					return Err(StatusCode::INTERNAL_SERVER_ERROR);
 				}
@@ -222,7 +222,7 @@ pub async fn create_ticket(
 					.await;
 
 				if let Err(e) = query {
-					admin_logger(&LogType::Error, &format!("failed to add notification in NewUserTicket. create request from {}, Error: {}", ticket.owner_id, e), None)
+					admin_logger(LogType::Error, &format!("failed to add notification in NewUserTicket. create request from {}, Error: {}", ticket.owner_id, e), None)
 						.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 					return Err(StatusCode::INTERNAL_SERVER_ERROR);
 				}
@@ -273,7 +273,7 @@ pub async fn create_ticket(
 	// when the server is successfully pinged later current notifications will be sent
 	if let Err(_e) = ping_notifier(Ping::CollectNew, None).await {
 		// FIXME: this might silently fail
-		let _ = admin_logger(&LogType::FailedToPing, 
+		let _ = admin_logger(LogType::FailedToPing, 
 			&format!("Failed to ping server for new notification node in NewUserTicket. create request from {}", ticket.owner_id), 
 			None
 		);
@@ -305,14 +305,14 @@ pub async fn update_ticket(
 		.await;
 
 	if let Err(e) = query {
-		admin_logger(&LogType::Error, &format!("Error reading ticket from db: {}", e), None)
+		admin_logger(LogType::Error, &format!("Error reading ticket from db: {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	let mut ticket = query.unwrap();
 
 	if ticket.status == "closed" {
-		admin_logger(&LogType::Error, 
+		admin_logger(LogType::Error, 
 			&format!("Attempt to update closed ticket. id: {}, user_id: {}", ticket.id, payload.user_id),
 			None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -411,7 +411,7 @@ pub async fn update_ticket(
 						.await;
 
 					if let Err(e) = owner_name_query {
-						admin_logger(&LogType::Error, &format!("failed to get owner name in notification NewUserTicket. create request from {}. Error: {}", ticket.owner_id, e), None)
+						admin_logger(LogType::Error, &format!("failed to get owner name in notification NewUserTicket. create request from {}. Error: {}", ticket.owner_id, e), None)
 							.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 						return Err(StatusCode::INTERNAL_SERVER_ERROR);
 					}
@@ -428,7 +428,7 @@ pub async fn update_ticket(
 						.await;
 
 					if let Err(e) = query {
-						admin_logger(&LogType::Error, &format!("failed to add notification in NewUserTicket. create request from {}, Error: {}", ticket.owner_id, e), None)
+						admin_logger(LogType::Error, &format!("failed to add notification in NewUserTicket. create request from {}, Error: {}", ticket.owner_id, e), None)
 							.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 						return Err(StatusCode::INTERNAL_SERVER_ERROR);
 					}
@@ -708,7 +708,7 @@ pub async fn get_user_tickets(
 		.fetch_all(&pool)
 		.await;
 	if let Err(e) = current_ticket_query {
-		admin_logger(&LogType::Error, &format!("Error reading current tickets: {}", e), None)
+		admin_logger(LogType::Error, &format!("Error reading current tickets: {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
@@ -722,7 +722,7 @@ pub async fn get_user_tickets(
 		.await;
 
 	if let Err(e) = own_ticket_query {
-		admin_logger(&LogType::Error, &format!("Error reading own tickets: {}", e), None)
+		admin_logger(LogType::Error, &format!("Error reading own tickets: {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}

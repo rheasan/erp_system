@@ -39,7 +39,7 @@ pub async fn ping_notifier(type_: Ping, data: Option<(String, String)>) -> Resul
 	let conn = TcpStream::connect(*NOTIF_ADDR).await;
 
 	if let Err(e) = conn {
-		admin_logger(&LogType::FailedToPing, &format!("Failed to ping notifier server. e: {}", e), None)
+		admin_logger(LogType::FailedToPing, &format!("Failed to ping notifier server. e: {}", e), None)
 			.map_err(|_e| FailedToLog)?;
 		return Err(FailedToNotify);
 	}
@@ -49,7 +49,7 @@ pub async fn ping_notifier(type_: Ping, data: Option<(String, String)>) -> Resul
 	let res = conn.write(&bytes).await;
 
 	if let Err(e) = res {
-		admin_logger(&LogType::FailedToPing, &format!("Failed to write to socket. e: {}", e), None)
+		admin_logger(LogType::FailedToPing, &format!("Failed to write to socket. e: {}", e), None)
 			.map_err(|_e| FailedToLog)?;
 		return Err(FailedToNotify);
 	}
@@ -61,7 +61,7 @@ pub async fn ping_notifier(type_: Ping, data: Option<(String, String)>) -> Resul
 		let res = conn.write(&bytes).await;
 
 		if let Err(e) = res {
-			admin_logger(&LogType::FailedToPing, &format!("Failed to write data to socket after successful ping. e: {}", e), None)
+			admin_logger(LogType::FailedToPing, &format!("Failed to write data to socket after successful ping. e: {}", e), None)
 				.map_err(|_e| FailedToLog)?;
 			return Err(FailedToNotify);
 		}
@@ -70,7 +70,7 @@ pub async fn ping_notifier(type_: Ping, data: Option<(String, String)>) -> Resul
 		let res = conn.write(&bytes).await;
 
 		if let Err(e) = res {
-			admin_logger(&LogType::FailedToPing, &format!("Failed to write data to socket after successful ping. e: {}", e), None)
+			admin_logger(LogType::FailedToPing, &format!("Failed to write data to socket after successful ping. e: {}", e), None)
 				.map_err(|_e| FailedToLog)?;
 			return Err(FailedToNotify);
 		}
@@ -87,7 +87,7 @@ pub async fn gen_token(
 	let token = utils::gen_random_token();
 	// tell notifier about this token
 	if let Err(_) = ping_notifier(Ping::ClientIdTransfer, Some((userid.to_string(), token.clone()))).await {
-		admin_logger(&LogType::FailedToPing, &format!("Failed to send client token to notifier. userid: {}.", userid), None)
+		admin_logger(LogType::FailedToPing, &format!("Failed to send client token to notifier. userid: {}.", userid), None)
 			.map_err(|_e| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}

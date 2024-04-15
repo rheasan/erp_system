@@ -28,7 +28,7 @@ pub async fn create_role(
 		.await;
 
 	if let Err(e) = insert_into_role {
-		admin_logger(&LogType::Error, &format!("Error insert into role_defs: {}", e), None)
+		admin_logger(LogType::Error, &format!("Error insert into role_defs: {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
@@ -44,7 +44,7 @@ pub async fn get_all_roles(
 		.await;
 
 	if let Err(e) = query {
-		admin_logger(&LogType::Error, &format!("Error in get_current_roles : {}", e), None)
+		admin_logger(LogType::Error, &format!("Error in get_current_roles : {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}

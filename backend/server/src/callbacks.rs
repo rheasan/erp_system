@@ -40,7 +40,7 @@ pub async fn send_task(ticket_id: i32, cur_node: i32, payload: &Option<Map<Strin
 
 	let conn = TcpStream::connect(*CALLBACK_ADDR).await;
 	if let Err(ref e) = conn {
-		let _ = admin_logger(&LogType::FailedToPing, &format!("Failed to ping callback server. e: {}", e), None)
+		let _ = admin_logger(LogType::FailedToPing, &format!("Failed to ping callback server. e: {}", e), None)
 			.map_err(|_e| ExecuteErr::FailedToLog);
 	}
 
@@ -48,7 +48,7 @@ pub async fn send_task(ticket_id: i32, cur_node: i32, payload: &Option<Map<Strin
 	let res = conn.write(&header_bytes).await;
 	
 	if let Err(ref e) = res {
-		let _ = admin_logger(&LogType::FailedToPing, &format!("Failed to send header to callback server. e: {}", e), None)
+		let _ = admin_logger(LogType::FailedToPing, &format!("Failed to send header to callback server. e: {}", e), None)
 			.map_err(|_e| ExecuteErr::FailedToLog);
 	}	
 

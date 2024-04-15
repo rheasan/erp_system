@@ -107,7 +107,7 @@ pub async fn get_all_processes(
 		.await;
 
 	if let Err(e) = query {
-		admin_logger(&LogType::Error, &format!("Error fetching process names: {}", e), None)
+		admin_logger(LogType::Error, &format!("Error fetching process names: {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
@@ -126,12 +126,12 @@ pub async fn create_process(
 	let config_path = CONFIG_DIR.join(format!("{}.json", pid));
 	match config_path.try_exists() {
 		Err(e) => {
-			admin_logger(&LogType::Error, &format!("Error reading saved process data: {}", e), None)
+			admin_logger(LogType::Error, &format!("Error reading saved process data: {}", e), None)
 				.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 		Ok(true) => {
-			admin_logger(&LogType::Error, &format!("Process with pid {} already exists", pid), None)
+			admin_logger(LogType::Error, &format!("Process with pid {} already exists", pid), None)
 				.map_err(|_| StatusCode::FORBIDDEN)?;
 			return Err(StatusCode::FORBIDDEN);
 		}
@@ -151,26 +151,26 @@ pub async fn create_process(
 		.await;
 
 	if let Err(e) = query {
-		admin_logger(&LogType::Error, &format!("Error inserting new process: {} for pid {}", e, payload.pid), None)
+		admin_logger(LogType::Error, &format!("Error inserting new process: {} for pid {}", e, payload.pid), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	if let Err(e) = save_process_data(&payload) {
-		admin_logger(&LogType::Error, &format!("Error saving new process data: {}", e), None)
+		admin_logger(LogType::Error, &format!("Error saving new process data: {}", e), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	let result = tx.commit().await;
 	if let Err(e) = result {
-		admin_logger(&LogType::Error, &format!("Error commiting transaction: {} for pid {}", e, payload.pid), None)
+		admin_logger(LogType::Error, &format!("Error commiting transaction: {} for pid {}", e, payload.pid), None)
 			.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 		std::fs::remove_file(config_path).unwrap();
 		return Err(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
-	admin_logger(&LogType::Info, &format!("Process {} created successfully", payload.pid), None)
+	admin_logger(LogType::Info, &format!("Process {} created successfully", payload.pid), None)
 		.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 	return Ok(StatusCode::CREATED);
 }
@@ -188,12 +188,12 @@ pub async fn get_process_data(
 	let config_path = CONFIG_DIR.join(format!("{}.json", pid));
 	match config_path.try_exists() {
 		Err(e) => {
-			admin_logger(&LogType::Error, &format!("Error reading saved process data: {}", e), None)
+			admin_logger(LogType::Error, &format!("Error reading saved process data: {}", e), None)
 				.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 		Ok(false) => {
-			admin_logger(&LogType::Error, &format!("Process with pid {} does not exist", pid), None)
+			admin_logger(LogType::Error, &format!("Process with pid {} does not exist", pid), None)
 				.map_err(|_| StatusCode::NOT_FOUND)?;
 			return Err(StatusCode::NOT_FOUND);
 		}
